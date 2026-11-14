@@ -37,7 +37,7 @@ cd bark-bridge-macos
 
 只生成当前架构的 `build/Bark.app`。不会安装或启动 App。签名为 ad-hoc，本候选未使用 Developer ID 签名或 Apple 公证。尚未提供可承诺直接下载安装的二进制发行包；请优先从源码在自己的 Mac 构建。
 
-GitHub Actions 检查文件已提供，但在远端实际运行前不宣称 CI 通过。
+每次提交会运行 [GitHub Actions 测试与构建](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)，实际结果以对应提交的检查记录为准。
 
 ## 首次安装
 
@@ -46,6 +46,8 @@ GitHub Actions 检查文件已提供，但在远端实际运行前不宣称 CI �
 ```sh
 /usr/bin/python3 scripts/install.py
 ```
+
+安装前请确认 Codex CLI 已安装，且能通过 PATH 或常见 App 路径找到。若安装在其他位置，请在这次安装命令前设置 `CODEX_CLI_BIN="/absolute/path/to/codex"`（下方也提供单独接入命令）。
 
 明确安装并接入一个 Codex 配置目录：
 
@@ -56,7 +58,9 @@ open /Applications/Bark.app
 
 安装器只支持首次安装；发现已有 Bark App 或共用运行目录会停止，防止覆盖其他安装。构建或测试不会调用安装器，也不触碰现有手机配置。未提供自动更新功能。
 
-打开“设置 → 接收设备”，在隐藏输入框中填写这台手机 Bark 首页的 HTTPS 推送地址。地址仅保存在本机受限权限文件中，不需要发到聊天、填入 Hook 或提交 GitHub。手机配置只填一次。
+如果首次安装中途失败，安装器可能已移除 App，但会保留共用运行目录和失败备份；不要反复运行 `--apply`。修正 CLI 路径或其他错误后，先把失败的共用目录移到另一安全位置保留备份，确认 `/Applications/Bark.app` 不存在，再重新首次安装。该步骤只适用于已失败且未投入使用的安装，不要移动仍在使用的运行目录。
+
+打开面板管理接收设备；也可点击屏幕右上角菜单栏铃铛 → “设置…”。在隐藏输入框中填写这台手机 Bark 首页的 HTTPS 推送地址，保存后发送测试并在手机确认收到。地址仅保存在本机受限权限文件中，不需要发到聊天、填入 Hook 或提交 GitHub。手机配置只填一次。
 
 Codex CLI 从 PATH 或常见 App 路径发现。若安装在其他位置，显式设置可执行文件路径后再运行接入：
 
@@ -117,7 +121,7 @@ Claude Code 模板先检查本机 CLI。缺少 CLI 时不会代装或生成设�
 /usr/bin/python3 "$HOME/Library/Application Support/CodexBark/manage.py" uninstall
 ```
 
-会删除本工具入口、手机配置与通知状态，保留其他 Codex/Claude 设置和备份。Claude 入口清理失败会停止整体卸载，避免留下失效 Hook；可检查本地 Claude 设置后重试。卸载后重启 Codex。共用代码和备份目录保留供检查，不要把整份旧配置覆盖回去。
+会删除本工具入口、手机配置与通知状态，保留其他 Codex/Claude 设置和备份。Claude 入口清理失败会停止整体卸载，避免留下失效 Hook；可检查本地 Claude 设置后重试。卸载后重启 Codex。共用代码和备份目录保留供检查，不要把整份旧配置覆盖回去。若已成功卸载并希望重新安装，先将保留的共用目录移到另一安全位置保存备份，再使用首次安装器；不要直接删除仍在使用的运行目录。
 
 ## 许可
 

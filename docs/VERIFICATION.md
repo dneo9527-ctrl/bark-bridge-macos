@@ -4,6 +4,6 @@
 
 2.4.1 本机补丁共通过 253 次 Python 测试执行（含继承重复回归），其中 14 项为新增聊天身份与索引边界用例。真实本机名称解析已验证；原截图中那条历史通知的完整 Hook 输入未保存，不能据此断言它当时一定来自分支或临时会话。新的完成测试遵守用户当前关闭设置而被跳过，不将其算作手机实收验证。
 
-公开源码候选另行运行仓库测试与本机构建，具体结果见仓库 release-check.json。测试仅使用仓库源码和临时文件；真实 Codex CLI 的隔离接入测试默认跳过，只有显式 BARK_RUN_CODEX_INTEGRATION=1 时启用。GitHub CI 尚未远端运行。
+公开源码候选另行运行仓库测试与本机构建，具体结果见仓库 release-check.json。测试仅使用仓库源码和临时文件；真实 Codex CLI 的隔离接入测试默认跳过，只有显式 BARK_RUN_CODEX_INTEGRATION=1 时启用。远端 CI 结果请查看 [对应提交的 Actions 记录](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)，本地测试结果不替代远端检查。
 
 尚未验证：真实 Claude Code 会话、Intel Mac、macOS 13 上的实机表现、第二实体手机、公开下载后二进制 Gatekeeper 行为、Developer ID 公证、长期耗电和新版本长期睡眠/离线稳定性。本候选不承诺这些未测场景。
