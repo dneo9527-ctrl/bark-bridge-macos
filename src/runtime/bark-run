@@ -1,0 +1,11 @@
+#!/bin/sh
+# Only run the command explicitly supplied by this invocation. Never record it.
+if [ "$#" -eq 0 ]; then
+    printf '%s\n' '用法：bark-run 可执行程序 参数…（管道请显式使用 shell -c）' >&2
+    exit 64
+fi
+"$@"
+bark_task_exit=$?
+bark_run_base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+/usr/bin/python3 "$bark_run_base/bark.py" template-notify --template terminal --exit-code "$bark_task_exit" </dev/null >/dev/null 2>&1 &
+exit "$bark_task_exit"

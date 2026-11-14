@@ -1,0 +1,28 @@
+{
+  "version": "2.4.1",
+  "build": 44,
+  "distribution": "source-first prerelease candidate",
+  "license_selected": true,
+  "python_test_executions": 259,
+  "python_test_passed": 258,
+  "python_test_skipped": 1,
+  "skip_reason": "real local Codex CLI integration requires explicit opt-in",
+  "native_build": "arm64 local build passed",
+  "minimum_target": "macOS13; only macOS26 arm64 physically tested",
+  "signature": "ad-hoc verified; not DeveloperID notarized",
+  "isolated_first_install": {
+    "isolated_clean_install_passed": true,
+    "real_app_launched": false,
+    "codex_attached": false,
+    "phone_config_created": false,
+    "temporary_install_removed_at_end": true
+  },
+  "source_audit": "allowlist/private-state filenames/personal paths/common device URLs and GitHub token patterns passed; not a universal secret guarantee",
+  "remote_ci_run": false,
+  "new_runtime_services": 0,
+  "real_claude_session_tested": false,
+  "current_user_phone_data_included": false,
+  "license": "MIT",
+  "verification_stage": "local checks before first public push",
+  "remote_ci_result": "See GitHub Actions checks for the current commit"
+}

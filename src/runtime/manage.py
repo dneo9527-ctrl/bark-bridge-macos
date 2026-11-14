@@ -1,0 +1,595 @@
+#!/usr/bin/python3
+"""Attach/uninstall this user's shared notifier. Never accesses account auth stores."""
+import argparse
+import datetime
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import selectors
+import shutil
+import sqlite3
+import subprocess
+import time
+
+BASE = Path(__file__).resolve().parent
+MANIFEST = BASE / "installation.json"
+def discover_codex_cli():
+    override = os.environ.get("CODEX_CLI_BIN")
+    if override:
+        path = Path(override).expanduser()
+        if not path.is_absolute() or not path.is_file() or not os.access(path, os.X_OK):
+            raise RuntimeError("CODEX_CLI_BIN must name an executable absolute path")
+        return path
+    found = shutil.which("codex")
+    if found: return Path(found)
+    for app in [Path("/Applications/Codex.app"), Path("/Applications/ChatGPT.app"), Path.home()/"Applications/Codex.app", Path.home()/"Applications/ChatGPT.app"]:
+        for suffix in ["Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex", "Contents/Resources/codex"]:
+            candidate = app / suffix
+            if candidate.is_file() and os.access(candidate, os.X_OK): return candidate
+    return Path("/nonexistent/codex")
+
+EXE = discover_codex_cli()
+START = "# BEGIN CODEX BARK SHARED HOOK TRUST"
+END = "# END CODEX BARK SHARED HOOK TRUST"
+CMD = "/usr/bin/python3 " + shlex.quote(str(BASE / "bark.py")) + " hook"
+QUESTION_MATCHER = r"(^|__|\.)(request_user_input|request_user_input_async|ask_user|ask_user_question)$"
+
+
+def atomic(path, text, mode=0o600):
+    import tempfile
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".codex-bark-")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def strip_block(text):
+    return re.sub(r"(?m)^" + re.escape(START) + r"\n.*?^" + re.escape(END) + r"\n?", "", text, flags=re.S)
+
+
+def backup(path, directory, label):
+    if path.exists():
+        shutil.copy2(path, directory / label)
+        os.chmod(directory / label, 0o600)
+
+
+import plistlib
+import stat
+
+LOGIN_FILE = Path.home() / "Library/LaunchAgents/local.codex.bark.menu.plist"
+APP_PATH = Path("/Applications/Bark.app")
+REQUIRED_HOOK_EVENTS = ("preToolUse", "permissionRequest", "sessionStart", "stop")
+MAX_HEALTH_HOMES = 16
+
+
+def hooks_list(home, timeout=15):
+    exe = str(EXE) if EXE.exists() else shutil.which("codex")
+    if not exe:
+        raise RuntimeError("Codex CLI not found")
+    env = dict(os.environ, CODEX_HOME=str(home))
+    p = subprocess.Popen([exe, "app-server", "--stdio"], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                         text=True, env=env)
+    sel = selectors.DefaultSelector()
+    sel.register(p.stdout, selectors.EVENT_READ)
+
+    def call(i, method, params):
+        p.stdin.write(json.dumps({"id": i, "method": method, "params": params}) + "\n")
+        p.stdin.flush()
+        deadline = time.monotonic() + max(0.5, float(timeout))
+        while time.monotonic() < deadline:
+            if sel.select(min(0.5, max(0.05, deadline - time.monotonic()))):
+                line = p.stdout.readline()
+                if not line:
+                    break
+                r = json.loads(line)
+                if r.get("id") == i:
+                    if "error" in r:
+                        raise RuntimeError("Codex local hooks API returned an error")
+                    return r["result"]
+        raise TimeoutError("Codex local hooks API timed out")
+
+    try:
+        call(1, "initialize", {"clientInfo": {"name": "codex_bark_installer", "version": "1.0"},
+                               "capabilities": {"experimentalApi": True}})
+        p.stdin.write('{"method":"initialized"}\n')
+        p.stdin.flush()
+        return call(2, "hooks/list", {"cwds": [str(home)]})["data"][0]
+    finally:
+        p.terminate()
+        try:
+            p.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+        sel.close()
+        p.stdin.close()
+        p.stdout.close()
+
+
+def _item(cid, title, status, code, detail):
+    return {"id": cid, "title": title, "status": status, "code": code, "detail": detail}
+
+
+def _safe_file_ok(path, uid, mask=0o022):
+    try:
+        if path.is_symlink() or not path.exists():
+            return False
+        st = path.stat()
+        return st.st_uid == uid and (stat.S_IMODE(st.st_mode) & mask) == 0
+    except OSError:
+        return False
+
+
+def _query_hooks(fn, home, timeout):
+    return fn(home, timeout=timeout)
+
+
+def _evaluate_hooks_payload(payload, expected_cmd):
+    if not isinstance(payload, dict) or not isinstance(payload.get("hooks"), list):
+        return ("unknown", "api_unknown", "本地 Hook 接口返回格式未知，无法确认状态。")
+    hooks = [h for h in payload["hooks"] if isinstance(h, dict)]
+    for event_name in REQUIRED_HOOK_EVENTS:
+        matched = [h for h in hooks if h.get("eventName") == event_name and h.get("command") == expected_cmd]
+        if not matched:
+            return ("warning", "missing_hook", "部分 Bark Hook 缺失，请重新运行接入配置。")
+        if len(matched) > 1:
+            return ("warning", "duplicate_hook", "检测到重复的 Bark Hook 条目，建议清理后重新接入。")
+        hook = matched[0]
+        if not isinstance(hook.get("enabled"), bool) or hook.get("trustStatus") not in ("trusted", "managed", "untrusted", "modified"):
+            return ("unknown", "api_unknown", "本地 Hook 接口返回格式未知，无法确认状态。")
+        if not hook["enabled"]:
+            return ("warning", "hook_disabled", "部分 Bark Hook 已被停用。")
+        if hook["trustStatus"] in ("untrusted", "modified"):
+            return ("warning", "hook_untrusted", "部分 Bark Hook 尚未获得信任授权。")
+        if event_name == "preToolUse" and "matcher" in hook and hook["matcher"] != QUESTION_MATCHER:
+            return ("warning", "hook_matcher_mismatch", "提问工具 Hook 匹配规则异常，请重新运行接入配置。")
+    return ("pass", "ok", "4 条 Hook 均已启用且受信任。")
+
+
+def _check_login_item(login_path, app_path):
+    try:
+        if not login_path.is_symlink() and not login_path.exists():
+            return _item("login_item", "登录启动项", "off", "login_off", "未开启登录时启动（按需手动启动）。")
+        if login_path.is_symlink() or not login_path.is_file():
+            return _item("login_item", "登录启动项", "warning", "invalid_login_item", "登录启动项文件异常，可在设置中重新切换。")
+        plist = plistlib.loads(login_path.read_bytes())
+        args = plist.get("ProgramArguments") if isinstance(plist, dict) else None
+        if (
+            not isinstance(plist, dict)
+            or plist.get("Label") != "local.codex.bark.menu"
+            or not isinstance(args, list)
+            or args != ["/usr/bin/open", "-g", str(app_path), "--args", "--background"]
+            or plist.get("RunAtLoad") is not True
+            or not app_path.is_dir()
+        ):
+            return _item("login_item", "登录启动项", "warning", "invalid_login_item", "登录启动项指向异常，可在设置中重新切换。")
+        return _item("login_item", "登录启动项", "pass", "ok", "登录启动项配置正常。")
+    except Exception:
+        return _item("login_item", "登录启动项", "warning", "invalid_login_item", "登录启动项无法解析，可在设置中重新切换。")
+
+
+def health_report(budget_seconds=20.0, per_home_timeout=4.0):
+    started = time.monotonic()
+    deadline = started + max(1.0, float(budget_seconds))
+    uid = os.getuid()
+    checks = []
+
+    # 1. 核心脚本与目录权限
+    bark_py = BASE / "bark.py"
+    manage_py = BASE / "manage.py"
+    if not (BASE.exists() and bark_py.is_file() and manage_py.is_file()):
+        checks.append(_item("runtime_files", "核心脚本与目录权限", "warning", "missing_runtime", "核心脚本缺失，请重新安装组件。"))
+    elif not (_safe_file_ok(BASE, uid, 0o077) and _safe_file_ok(bark_py, uid, 0o022) and _safe_file_ok(manage_py, uid, 0o022)):
+        checks.append(_item("runtime_files", "核心脚本与目录权限", "warning", "unsafe_permissions", "目录或脚本权限不安全，请修复权限。"))
+    else:
+        checks.append(_item("runtime_files", "核心脚本与目录权限", "pass", "ok", "核心脚本与数据目录权限正常。"))
+
+    # 2. 共享 Skill 目录
+    skill_dir = BASE / "skill"
+    skill_md = skill_dir / "SKILL.md"
+    try:
+        skill_ready = (
+            skill_dir.is_dir()
+            and not skill_dir.is_symlink()
+            and skill_md.is_file()
+            and not skill_md.is_symlink()
+            and skill_md.stat().st_size > 0
+        )
+    except OSError:
+        skill_ready = False
+    checks.append(
+        _item("shared_skill", "共享通知技能", "pass", "ok", "共享技能文件已就绪。")
+        if skill_ready
+        else _item("shared_skill", "共享通知技能", "warning", "missing_skill", "共享技能文件缺失或异常。")
+    )
+
+    # 3. 安装清单与登记的 Codex 环境（最多 16 个，严格只读）
+    homes = None
+    try:
+        if not MANIFEST.exists() and not MANIFEST.is_symlink():
+            checks.append(_item("manifest", "安装清单", "warning", "manifest_missing", "尚未登记 Codex 环境，请运行接入配置。"))
+        elif MANIFEST.is_symlink() or not MANIFEST.is_file():
+            checks.append(_item("manifest", "安装清单", "warning", "invalid_manifest", "安装清单文件异常，请重新运行接入配置。"))
+        else:
+            raw = json.loads(MANIFEST.read_text())
+            if not isinstance(raw, dict) or not isinstance(raw.get("homes"), dict) or not raw["homes"]:
+                checks.append(_item("manifest", "安装清单", "warning", "invalid_manifest", "安装清单格式异常或未包含有效环境。"))
+            else:
+                homes = list(raw["homes"].keys())[:MAX_HEALTH_HOMES]
+                if len(raw["homes"]) > MAX_HEALTH_HOMES:
+                    checks.append(_item("home_limit", "登记环境数量", "unknown", "home_limit", "登记环境较多，本次仅检查前 16 个。"))
+                checks.append(_item("manifest", "安装清单", "pass", "ok", "安装清单已就绪。"))
+    except Exception:
+        checks.append(_item("manifest", "安装清单", "warning", "invalid_manifest", "安装清单无法解析，请重新运行接入配置。"))
+
+    if homes:
+        target_skill_real = None
+        try:
+            target_skill_real = skill_dir.resolve(strict=True) if skill_ready else None
+        except OSError:
+            target_skill_real = None
+
+        for idx, home_str in enumerate(homes, start=1):
+            label = f"Codex 环境 #{idx}"
+            try:
+                home_path = Path(home_str)
+                home_exists = isinstance(home_str, str) and home_path.is_absolute() and not home_path.is_symlink() and home_path.is_dir() and home_path.stat().st_uid == uid
+            except Exception:
+                home_exists = False
+
+            if not home_exists:
+                checks.append(_item(f"home_{idx}", label, "warning", "home_missing", "登记的 Codex 目录不存在，已跳过 CLI 检查。"))
+                continue
+
+            # 校验该环境下的 codex-bark-wait 技能链接
+            link_path = home_path / "skills/codex-bark-wait"
+            try:
+                link_ok = (
+                    target_skill_real is not None
+                    and link_path.exists()
+                    and link_path.resolve(strict=True) == target_skill_real
+                    and (link_path / "SKILL.md").is_file()
+                )
+            except OSError:
+                link_ok = False
+            checks.append(
+                _item(f"home_{idx}_skill", f"{label} · 技能链接", "pass", "ok", "通知技能链接正常。")
+                if link_ok
+                else _item(f"home_{idx}_skill", f"{label} · 技能链接", "warning", "invalid_skill_link", "通知技能链接缺失或指向错误。")
+            )
+
+            # 校验该环境下的 4 条 Hook（遵守全局预算）
+            remaining = deadline - time.monotonic()
+            if remaining <= 4.5:
+                checks.append(_item(f"home_{idx}_hooks", f"{label} · Hook 状态", "unknown", "check_timeout", "健康检查总耗时达到上限，剩余环境暂未查询。"))
+                continue
+
+            try:
+                payload = _query_hooks(hooks_list, home_path, timeout=min(float(per_home_timeout), 3.0, max(0.5, (remaining - 3.5) / 2)))
+                h_status, h_code, h_detail = _evaluate_hooks_payload(payload, CMD)
+            except (TimeoutError, subprocess.TimeoutExpired):
+                h_status, h_code, h_detail = ("unknown", "api_timeout", "本地 Hook 接口响应超时，稍后可重试。")
+            except Exception:
+                h_status, h_code, h_detail = ("unknown", "api_unavailable", "无法通过本地接口查询 Hook 状态。")
+            checks.append(_item(f"home_{idx}_hooks", f"{label} · Hook 状态", h_status, h_code, h_detail))
+
+    # 4. 登录启动项（关闭属于正常偏好，status="off" 不触发全局失败）
+    checks.append(_check_login_item(LOGIN_FILE, APP_PATH))
+
+    statuses = {c["status"] for c in checks}
+    if "warning" in statuses:
+        summary = "attention"
+    elif "unknown" in statuses:
+        summary = "unknown"
+    else:
+        summary = "ready"
+
+    return {
+        "ok": True,
+        "summary": summary,
+        "checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "checks": checks,
+    }
+
+
+def support_report(snapshot_provider=None, health_provider=None):
+    """On-demand allowlisted diagnostics; never export paths, names or content."""
+    if snapshot_provider is None:
+        def snapshot_provider():
+            p = subprocess.run(["/usr/bin/python3", str(BASE / "bark.py"), "snapshot", "--view", "history"],
+                               capture_output=True, timeout=5)
+            return json.loads(p.stdout) if p.returncode == 0 else {}
+    try: snap = snapshot_provider()
+    except Exception: snap = {}
+    if not isinstance(snap, dict): snap = {}
+    try: health = (health_provider or health_report)()
+    except Exception: health = {}
+    if not isinstance(health, dict): health = {}
+    codes = {"ok", "missing_runtime", "unsafe_permissions", "missing_skill", "manifest_missing", "invalid_manifest",
+             "home_limit", "home_missing", "invalid_skill_link", "check_timeout", "api_timeout", "api_unavailable",
+             "api_unknown", "missing_hook", "duplicate_hook", "hook_disabled", "hook_untrusted", "hook_matcher_mismatch",
+             "login_off", "invalid_login_item", "health_failed"}
+    statuses = {"pass", "warning", "off", "unknown"}
+    raw_checks = health.get("checks", [])
+    if not isinstance(raw_checks, list): raw_checks = []
+    checks = [{"item": i + 1, "status": x.get("status") if x.get("status") in statuses else "unknown",
+               "code": x.get("code") if x.get("code") in codes else "api_unknown"}
+              for i, x in enumerate(raw_checks[:100]) if isinstance(x, dict)]
+    kinds = {"complete", "battery", "test", "permission", "question", "application", "source_test", "control"}
+    reasons = {"dns_error", "connect_error", "timeout", "tls_error", "transport_error", "http_auth", "endpoint_missing",
+               "rate_limited", "server_error", "request_rejected", "api_rejected", "invalid_response", "sender_unavailable",
+               "unknown_error", "partial", "multiple_failures", "local_config_error", "invalid_rules", "not_configured", "accepted"}
+    counts = {"accepted": 0, "partial": 0, "send_failed": 0, "skipped": 0}
+    failures = []
+    rows = snap.get("events", [])
+    for row in rows[-200:] if isinstance(rows, list) else []:
+        if not isinstance(row, dict): continue
+        state = row.get("status")
+        if state in counts: counts[state] += 1
+        elif row.get("category") == "skipped": counts["skipped"] += 1
+        if state not in ("send_failed", "partial", "not_configured"): continue
+        devices = row.get("device_results", [])
+        devices = devices if isinstance(devices, list) else []
+        failures.append({"kind": row.get("kind") if row.get("kind") in kinds else "application", "status": state,
+                         "reason": row.get("reason") if row.get("reason") in reasons else "unknown_error",
+                         "devices": [{"item": i + 1, "reason": x.get("reason") if x.get("reason") in reasons else "unknown_error"}
+                                     for i, x in enumerate(devices[:16]) if isinstance(x, dict)]})
+    version = "unknown"
+    try:
+        value = plistlib.loads((APP_PATH / "Contents/Info.plist").read_bytes()).get("CFBundleShortVersionString")
+        if isinstance(value, str) and re.fullmatch(r"[0-9]{1,4}(?:\.[0-9]{1,4}){1,3}", value): version = value
+    except Exception: pass
+    status = snap.get("status", {})
+    status = status if isinstance(status, dict) else {}
+    return {"ok": True, "report": {"schema": 1, "app_version": version,
+            "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "snapshot_available": snap.get("ok") is True,
+            "configured": status.get("configured") is True, "enabled": status.get("enabled") is True,
+            "health_summary": health.get("summary") if health.get("summary") in {"ready", "attention", "unknown"} else "unknown",
+            "checks": checks, "recent_results": counts, "recent_failures": failures[-20:],
+            "scope": "local_configuration_and_gateway_results_only"}}
+
+
+def trust_block(records):
+    rows = [START]
+    for key, value in records.items():
+        rows.extend(["[hooks.state." + json.dumps(key, ensure_ascii=False) + "]",
+                     "enabled = true", "trusted_hash = " + json.dumps(value), ""])
+    rows.append(END)
+    return "\n".join(rows) + "\n"
+
+
+def load_manifest():
+    return json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"homes": {}, "backups": []}
+
+
+def save_manifest(m):
+    atomic(MANIFEST, json.dumps(m, ensure_ascii=False, indent=2) + "\n")
+
+
+def update_common(block, backup_dir=None, remove=False):
+    # Select/update ONLY the common TOML value, never account/provider rows or auth JSON.
+    db = Path.home() / ".cc-switch/cc-switch.db"
+    if not db.exists():
+        return False
+    c = sqlite3.connect(str(db), timeout=2)
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        r = c.execute("SELECT value FROM settings WHERE key='common_config_codex'").fetchone()
+        if not r:
+            c.rollback()
+            return False
+        old = r[0]
+        new = strip_block(old)
+        if not remove:
+            new = new.rstrip() + "\n\n" + block
+        if old != new:
+            if backup_dir:
+                atomic(backup_dir / "cc-switch-common-config.toml", old)
+            c.execute("UPDATE settings SET value=? WHERE key='common_config_codex' AND value=?", (new, old))
+            if c.total_changes != 1:
+                raise RuntimeError("CC Switch common config changed concurrently")
+        c.commit()
+        return True
+    finally:
+        c.close()
+
+
+def attach(home, with_cc_switch=False):
+    home = Path(home).expanduser().resolve()
+    home.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    b = BASE / "backups" / timestamp
+    b.mkdir(parents=True, mode=0o700)
+    config = home / "config.toml"
+    hooks = home / "hooks.json"
+    backup(config, b, "config.toml")
+    backup(hooks, b, "hooks.json")
+    config_existed = config.exists()
+    old_config = config.read_text() if config_existed else ""
+    old_hooks = hooks.read_text() if hooks.exists() else None
+    h = json.loads(old_hooks) if old_hooks else {"hooks": {}}
+    h.setdefault("hooks", {})
+    entries = [
+        ("PermissionRequest", None, True, "Codex Bark: waiting for permission"),
+        ("PreToolUse", QUESTION_MATCHER, True, "Codex Bark: waiting for answer"),
+        ("SessionStart", None, False, "Codex Bark: load question reminder"),
+        ("Stop", None, True, "Codex Bark: turn finished"),
+    ]
+    for event, matcher, asynchronous, label in entries:
+        groups = h["hooks"].setdefault(event, [])
+        if any(x.get("command") == CMD for g in groups for x in g.get("hooks", [])):
+            continue
+        group = {"hooks": [{"type": "command", "command": CMD, "async": asynchronous,
+                            "timeout": 3, "statusMessage": label}]}
+        if matcher:
+            group["matcher"] = matcher
+        groups.append(group)
+    original_skill_present = (home / "skills/codex-bark-wait").exists() or (home / "skills/codex-bark-wait").is_symlink()
+    atomic(hooks, json.dumps(h, ensure_ascii=False, indent=2) + "\n")
+    try:
+        loaded = hooks_list(home)
+        ours = [x for x in loaded["hooks"] if x.get("command") == CMD]
+        if loaded["errors"] or len(ours) != 4:
+            raise RuntimeError("Codex did not load all 4 notification hooks")
+        records = {x["key"]: x["currentHash"] for x in ours}
+        block = trust_block(records)
+        new_config = strip_block(old_config).rstrip() + "\n\n" + block
+        atomic(config, new_config)
+        loaded = hooks_list(home)
+        ours = [x for x in loaded["hooks"] if x.get("command") == CMD]
+        if loaded["errors"] or any(x["trustStatus"] != "trusted" for x in ours):
+            raise RuntimeError("Notification hooks did not pass exact-definition trust verification")
+        skill = home / "skills/codex-bark-wait"
+        skill.parent.mkdir(exist_ok=True)
+        if skill.exists() or skill.is_symlink():
+            if not skill.is_symlink() or skill.resolve() != (BASE / "skill").resolve():
+                raise RuntimeError("Existing unrelated codex-bark-wait skill; not replacing it")
+        else:
+            skill.symlink_to(BASE / "skill", target_is_directory=True)
+        m = load_manifest()
+        m.pop("uninstalled", None)
+        original = m["homes"].get(str(home), {})
+        m["homes"][str(home)] = {"trust": records, "skill_link": str(skill),
+                                  "config_existed": original.get("config_existed", bool(old_config)),
+                                  "hooks_existed": original.get("hooks_existed", old_hooks is not None)}
+        m["backups"].append(str(b))
+        # Combine all installed homes' entries so every account directory uses one key.
+        all_records = {k: v for x in m["homes"].values() for k, v in x["trust"].items()}
+        m["cc_switch_common_updated"] = (update_common(trust_block(all_records), b) if with_cc_switch else m.get("cc_switch_common_updated", False))
+        save_manifest(m)
+        print(json.dumps({"home": str(home), "trusted_hooks": len(ours),
+                          "hook_errors": len(loaded["errors"]), "warnings": loaded["warnings"],
+                          "cc_switch_common_updated": m["cc_switch_common_updated"],
+                          "backup": str(b)}, ensure_ascii=False))
+    except Exception:
+        if config_existed: atomic(config, old_config)
+        else: config.unlink(missing_ok=True)
+        link = home / "skills/codex-bark-wait"
+        if link.is_symlink() and link.resolve() == (BASE / "skill").resolve():
+            if not original_skill_present: link.unlink()
+        if old_hooks is None:
+            hooks.unlink(missing_ok=True)
+        else:
+            atomic(hooks, old_hooks)
+        raise
+
+
+def remove_own_trust(text, records):
+    text = strip_block(text)
+    # Codex may reformat TOML and remove comments. Remove only our exact known trust keys.
+    lines = text.splitlines(keepends=True)
+    out = []
+    skip = False
+    for line in lines:
+        if line.lstrip().startswith("["):
+            skip = False
+            match = re.match(r'^\s*\[hooks\.state\.("(?:[^"\\]|\\.)*")\]\s*$', line)
+            if match and json.loads(match[1]) in records:
+                skip = True
+        if not skip:
+            out.append(line)
+    return "".join(out)
+
+
+def uninstall():
+    adapter = BASE / "claude_bark.py"
+    if adapter.is_file():
+        result = subprocess.run(["/usr/bin/python3", str(adapter), "detach"], capture_output=True, timeout=5)
+        try: detached = json.loads(result.stdout)
+        except ValueError: detached = {}
+        if detached.get("ok") is not True:
+            print("Claude Code 通知入口未能移除，已停止卸载，请检查其本地配置后重试。")
+            return
+    m = load_manifest()
+    for name, item in m["homes"].items():
+        home = Path(name)
+        p = home / "hooks.json"
+        if p.exists():
+            h = json.loads(p.read_text())
+            for event in list(h.get("hooks", {})):
+                groups = h["hooks"][event]
+                for g in groups:
+                    g["hooks"] = [x for x in g.get("hooks", []) if x.get("command") != CMD]
+                h["hooks"][event] = [g for g in groups if g["hooks"]]
+                if not h["hooks"][event]:
+                    del h["hooks"][event]
+            if not item["hooks_existed"] and not h.get("hooks") and len(h) == 1:
+                p.unlink()
+            else:
+                atomic(p, json.dumps(h, ensure_ascii=False, indent=2) + "\n")
+        p = home / "config.toml"
+        if p.exists():
+            atomic(p, remove_own_trust(p.read_text(), item["trust"]))
+        link = Path(item["skill_link"])
+        if link.is_symlink() and link.resolve() == (BASE / "skill").resolve():
+            link.unlink()
+    if m.get("cc_switch_common_updated") is True:
+        update_common("", remove=True)
+    # Delete the secret and local notification state. Keep code/backups for review/rollback.
+    for pattern in ("config.json", "state.sqlite3*", "events*.jsonl", "menu-state.json", "sources.json", ".sources.lock", ".log.lock", ".config.lock", "rules.json", ".rules.lock"):
+        for p in BASE.glob(pattern):
+            p.unlink(missing_ok=True)
+    gui = m.get("menu_app")
+    if gui:
+        import plistlib
+        app = Path(gui["path"])
+        login = Path(gui["login_plist"])
+        if login.exists():
+            try:
+                if plistlib.loads(login.read_bytes()).get("Label") == "local.codex.bark.menu":
+                    login.unlink()
+            except Exception:
+                pass
+        subprocess.run(["/bin/launchctl", "bootout", "gui/" + str(os.getuid()) + "/local.codex.bark.menu"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["/usr/bin/pkill", "-x", "CodexBarkMenu"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["/usr/bin/pkill", "-x", "CodexBarkPanel"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        info = app / "Contents/Info.plist"
+        if info.exists() and plistlib.loads(info.read_bytes()).get("CFBundleIdentifier") == "local.codex.bark.menu":
+            shutil.rmtree(app)
+    (BASE / ".menu-instance.lock").unlink(missing_ok=True)
+    m["uninstalled"] = True
+    save_manifest(m)
+    print("已卸载通知入口、菜单栏应用和登录启动项，删除 Bark 密钥和通知状态。原配置及备份保留。请重启 Codex。")
+
+
+def main():
+    os.umask(0o077)
+    p = argparse.ArgumentParser()
+    p.add_argument("action", choices=["attach", "check", "uninstall", "health", "support-report"])
+    p.add_argument("home", nargs="?", default=str(Path.home() / ".codex"))
+    p.add_argument("--with-cc-switch", action="store_true", help="Explicitly merge Bark Hook trust into CC Switch common config")
+    a = p.parse_args()
+    if a.action == "support-report":
+        try: result = support_report()
+        except Exception: result = {"ok": False, "error": "report_unavailable"}
+        print(json.dumps(result, ensure_ascii=False))
+    elif a.action == "health":
+        try:
+            result = health_report()
+        except Exception:
+            result = {"ok": True, "summary": "unknown", "checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                      "checks": [_item("health", "接入自检", "unknown", "health_failed", "暂无法完成本地接入检查，请稍后重试。") ]}
+        print(json.dumps(result, ensure_ascii=False))
+    elif a.action == "attach":
+        attach(a.home, with_cc_switch=a.with_cc_switch)
+    elif a.action == "uninstall":
+        uninstall()
+    else:
+        d = hooks_list(Path(a.home).expanduser().resolve())
+        print(json.dumps({"hooks": [{k: x[k] for k in ("eventName", "enabled", "trustStatus", "async")} for x in d["hooks"] if x.get("command") == CMD],
+                          "errors": d["errors"], "warnings": d["warnings"]}, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

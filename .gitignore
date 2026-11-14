@@ -1,0 +1,16 @@
+build/
+dist/
+__pycache__/
+*.py[cod]
+.DS_Store
+config.json
+rules.json
+sources.json
+installation.json
+claude_installation.json
+*.sqlite*
+*.jsonl
+backups/
+.env*
+*.pem
+*.key

@@ -1,0 +1,13 @@
+name: macOS source checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Isolated tests
+        run: /usr/bin/python3 scripts/test.py
+      - name: Build for the runner architecture
+        run: /usr/bin/python3 scripts/build.py
