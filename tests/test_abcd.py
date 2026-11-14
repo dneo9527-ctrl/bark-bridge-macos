@@ -175,7 +175,10 @@ class ApprovedFeatureTests(unittest.TestCase):
     def test_detached_hook_obeys_quiet_without_blocking_or_policy_output(self):
         now=datetime.datetime.now().astimezone();m=now.hour*60+now.minute
         def clock(n):return f'{(n%1440)//60:02d}:{n%60:02d}'
-        self.m.set_quiet({'enabled':True,'start':clock(m-1),'end':clock(m+1)})
+        # The end is exclusive: leave a full minute for an async worker
+        # even when this test starts just before the minute rolls over.
+        self.m.set_quiet({'enabled':True,'start':clock(m-1),'end':clock(m+2)})
+        self.assertTrue(self.m.quiet_now(now=now+datetime.timedelta(minutes=1)))
         start=time.monotonic()
         p=subprocess.run(['/usr/bin/python3',str(self.base/'bark.py'),'hook'],input='{"hook_event_name":"PermissionRequest","tool_input":{"command":"PRIVATE_TOOL"}}',capture_output=True,text=True,timeout=1)
         self.assertEqual((p.returncode,p.stdout,p.stderr),(0,'',''));self.assertLess(time.monotonic()-start,1)
