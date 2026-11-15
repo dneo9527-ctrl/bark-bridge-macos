@@ -24,6 +24,12 @@ import uuid
 import unicodedata
 
 BASE = Path(__file__).resolve().parent
+
+
+def python_executable():
+    bundled = BASE / "python/bin/python3"
+    return str(bundled) if bundled.is_file() else "/usr/bin/python3"
+
 CONFIG = BASE / "config.json"
 STATE = BASE / "state.sqlite3"
 LOG = BASE / "events.jsonl"
@@ -680,7 +686,7 @@ def add_sources(paths):
 
 def change_source(source_id, enabled=None, remove=False):
     if remove and source_id == "claude-code" and (BASE / "claude_bark.py").is_file():
-        result = subprocess.run(["/usr/bin/python3", str(BASE / "claude_bark.py"), "detach"], capture_output=True, timeout=8)
+        result = subprocess.run([python_executable(), str(BASE / "claude_bark.py"), "detach"], capture_output=True, timeout=8)
         try: detached = json.loads(result.stdout)
         except ValueError: detached = {}
         if detached.get("ok") is not True: raise ValueError("claude_detach_failed")

@@ -5,10 +5,10 @@
   <p>把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。<br>同一 Mac 用户共用设备配置，现有接入目录换号继续用。</p>
   <p>
     <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml"><img src="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml/badge.svg" alt="macOS 测试与构建状态"></a>
-    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/version.svg" alt="2.4.1 源码预览版"></a>
+    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.5.0-preview.1"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/version.svg" alt="2.5.0 安装预览版"></a>
     <a href="LICENSE"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/license.svg" alt="MIT 许可证"></a>
   </p>
-  <p><a href="#快速开始">快速开始</a> · <a href="docs/INSTALL.md">安装与接入</a> · <a href="docs/PRIVACY.md">隐私说明</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1">下载源码</a></p>
+  <p><a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.5.0-preview.1">下载安装预览</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.5.0-preview.1/Bark-Bridge-30s-demo.mp4">30 秒演示</a> · <a href="docs/INSTALL.md">安装与接入</a> · <a href="docs/PRIVACY.md">隐私说明</a></p>
 </div>
 
 <picture>
@@ -16,7 +16,7 @@
   <img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/overview.svg" width="1320" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。">
 </picture>
 
-> **当前为源码预发布。** 需要在 Mac 本地构建；尚未提供经过 Developer ID 公证的预编译安装包。以下介绍的是现有功能，插图为示意。
+> **2.5.0 安装预览现已提供。** Apple Silicon ZIP 内含图形安装助手与 Python，无需源码编译。尚未使用 Developer ID 签名或 Apple 公证，首次打开可能被 macOS 拦截；仅供愿意核对来源的用户试用。插图和视频均为功能示意。
 
 ## 离开电脑，也知道下一步
 
@@ -56,6 +56,12 @@
 
 ## 快速开始
 
+**推荐首次试用：** 从 [Releases 下载 Apple Silicon 安装预览 ZIP](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.5.0-preview.1)，解压后先阅读 `Start Here.html`，再打开 `Install Bark Bridge.app`。查看安装位置、选择是否接入默认 Codex 目录，点击“安装并打开”。内置 Python，无需 Xcode 或终端。
+
+**已有安装请继续使用原 App。** 该助手只支持首次安装，检测到已有 App 或共用运行目录时会停止。它不负责自动升级。未公证包的系统提示请参考 [Apple 安全打开说明](https://support.apple.com/102445)，不修改全局安全设置。
+
+以下为**从源码构建**的替代方式：
+
 **准备：** iPhone 安装 [Bark](https://github.com/Finb/Bark) 并允许通知；Mac 需要 Xcode 或 Command Line Tools、`/usr/bin/python3` 和 `curl`。测试还使用系统 OpenSSL，Python 无 pip 依赖。
 
 ### 1. 获取源码并构建
@@ -67,7 +73,7 @@ cd bark-bridge-macos
 /usr/bin/python3 scripts/build.py
 ```
 
-也可以从 [Releases](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1) 下载源码 ZIP，解压后进入目录。构建只生成 `build/Bark.app`，不会安装或启动。
+也可以从 [Releases](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.5.0-preview.1) 下载源码 ZIP，解压后进入目录。构建只生成 `build/Bark.app`，不会安装或启动。
 
 ### 2. 预览并明确安装
 
@@ -102,7 +108,7 @@ open /Applications/Bark.app
 - **平台：** 界面仅在 macOS 26、Apple Silicon 实机验证；构建目标为 macOS 13+，旧系统和 Intel 界面尚未实测。
 - **Codex 兼容：** 已验证版本为 `0.167.0-alpha.3.2`，Hook 与信任接口可能随更新变化；云端会话不自动继承本机接入。
 - **送达：** 网关接受不等于手机实收。Mac 睡眠、关机、离线、APNs 或 iPhone 专注设置都可能影响提醒。
-- **分发：** 本地构建采用 ad-hoc 签名，未做 Developer ID 公证；现有源码预览不含通用预编译 App。
+- **分发：** 安装预览仅提供 Apple Silicon，采用 ad-hoc 签名，未使用 Developer ID 签名或 Apple 公证；首次安装与嵌入式 Python 已做隔离验证，全新 Mac 的下载隔离提示与首次打开流程尚未实机验收。
 
 本项目的[验证范围](docs/VERIFICATION.md)与[对应提交的 CI 结果](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)分别记录，不将隔离测试当作全部场景实测。
 
@@ -110,4 +116,4 @@ open /Applications/Bark.app
 
 遇到问题，可在 [Issues](https://github.com/dneo9527-ctrl/bark-bridge-macos/issues) 描述 Mac／Codex 版本、触发场景及脱敏错误类别。提交截图前请隐藏聊天内容、设备地址和密钥。欢迎通过 Pull Request 改进兼容性、文档与测试。
 
-本项目采用 [MIT 许可证](LICENSE)。独立社区工具，与 Bark、OpenAI、Anthropic 无官方关联。图标由本项目的 AI 设计流程生成并适配，不使用 Bark 官方图标。插图为功能示意，非实机截图。
+本项目自己的代码采用 [MIT 许可证](LICENSE)。安装预览内嵌 Python 及依赖，来源固定于 [运行时清单](assets/python-runtime.json)，各自许可见 [第三方许可](assets/python-licenses)。独立社区工具，与 Bark、OpenAI、Anthropic 无官方关联。图标由本项目的 AI 设计流程生成并适配，不使用 Bark 官方图标。插图与视频为功能示意，非实机录屏或送达证据。

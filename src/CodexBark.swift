@@ -7,13 +7,17 @@ let support = FileManager.default.homeDirectoryForCurrentUser.appendingPathCompo
 let loginFile = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/local.codex.bark.menu.plist")
 let preferences = UserDefaults(suiteName: "local.codex.bark.menu")!
 func shellQuote(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
-let barkScriptCommand = "/usr/bin/python3 " + shellQuote(support.appendingPathComponent("bark.py").path)
+let pythonURL: URL = {
+    let bundled = support.appendingPathComponent("python/bin/python3")
+    return FileManager.default.isExecutableFile(atPath: bundled.path) ? bundled : URL(fileURLWithPath: "/usr/bin/python3")
+}()
+let barkScriptCommand = shellQuote(pythonURL.path) + " " + shellQuote(support.appendingPathComponent("bark.py").path)
 let taskWrapperCommand = shellQuote(support.appendingPathComponent("bark-run").path)
 let installedAppURL = URL(fileURLWithPath: "/Applications/Bark.app")
 
 func backend(_ args: [String], input: Data? = nil, script: String = "bark.py") -> [String: Any] {
     let p = Process()
-    p.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+    p.executableURL = pythonURL
     p.arguments = [support.appendingPathComponent(script).path] + args
     let out = Pipe()
     p.standardOutput = out
@@ -1792,7 +1796,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.activate(ignoringOtherApps: true)
         guard dialog.runModal() == .alertSecondButtonReturn else { return }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        p.executableURL = pythonURL
         p.arguments = [support.appendingPathComponent("manage.py").path, "uninstall"]
         p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
         do { try p.run() } catch { alert("未能卸载", "请使用安装说明中的卸载入口。") }

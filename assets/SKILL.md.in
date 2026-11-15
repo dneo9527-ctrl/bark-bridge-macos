@@ -8,7 +8,7 @@ Send one reminder before asking a question or presenting choices that require a 
 For a content preview, run this fixed command with an interactive stdin (`tty: true` when using `exec_command`):
 
 ```sh
-/usr/bin/python3 "@BARK_BASE@/bark.py" wait --preview-json
+@BARK_PYTHON@ "@BARK_BASE@/bark.py" wait --preview-json
 ```
 
 Once its session is waiting for input, use `write_stdin` to send one compact JSON line followed by a newline. The command disables terminal echo. For example, the data shape is:
@@ -24,7 +24,7 @@ Keep preview content out of shell command strings, process arguments and tempora
 If interactive stdin is unavailable, or there is no suitable non-sensitive preview, use the backward-compatible fallback:
 
 ```sh
-/usr/bin/python3 "@BARK_BASE@/bark.py" wait
+@BARK_PYTHON@ "@BARK_BASE@/bark.py" wait
 ```
 
 The user can turn off names and content through Bark > 来源 > Codex > … > 手机内容预览. In that mode the sender uses the original generic reminder. Phone delivery failure must never delay the question or change permissions. Do not read the Bark config, account credentials or transcript files. Status is available via `bark.py status` without secrets.

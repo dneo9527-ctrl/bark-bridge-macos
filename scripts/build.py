@@ -28,7 +28,7 @@ def main():
         shutil.copy2(ROOT / 'assets/AppIcon.icns', bundle / 'Contents/Resources/AppIcon.icns')
         info = dict(CFBundleName='Bark', CFBundleDisplayName='Bark', CFBundlePackageType='APPL',
                     CFBundleExecutable=executable, CFBundleIdentifier=identifier, CFBundleIconFile='AppIcon',
-                    CFBundleShortVersionString=version, CFBundleVersion='44', LSMinimumSystemVersion='13.0',
+                    CFBundleShortVersionString=version, CFBundleVersion='45', LSMinimumSystemVersion='13.0',
                     LSUIElement=accessory, LSMultipleInstancesProhibited=True, NSHighResolutionCapable=True)
         (bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-O', '-target', args.arch+'-apple-macos13.0',

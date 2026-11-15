@@ -1,21 +1,31 @@
 {
-  "version": "2.4.1",
-  "build": 44,
-  "distribution": "source-first prerelease candidate",
+  "version": "2.5.0",
+  "build": 45,
+  "distribution": "Apple Silicon graphical first-install developer preview",
   "license_selected": true,
-  "python_test_executions": 259,
-  "python_test_passed": 258,
+  "python_test_executions": 266,
+  "python_test_passed": 265,
   "python_test_skipped": 1,
   "skip_reason": "real local Codex CLI integration requires explicit opt-in",
   "native_build": "arm64 local build passed",
   "minimum_target": "macOS13; only macOS26 arm64 physically tested",
   "signature": "ad-hoc verified; not DeveloperID notarized",
   "isolated_first_install": {
-    "isolated_clean_install_passed": true,
-    "real_app_launched": false,
-    "codex_attached": false,
-    "phone_config_created": false,
-    "temporary_install_removed_at_end": true
+    "archive_checksum": true,
+    "extracted_installer_signature": true,
+    "payload_matches_public_sources": true,
+    "upstream_public_ca_bundle_unchanged": true,
+    "private_state_absent": true,
+    "gui_honors_cli_override": true,
+    "isolated_first_install": true,
+    "bundled_python_status": true,
+    "trusted_hooks": 4,
+    "existing_install_refused": true,
+    "policy_and_unrelated_hooks_preserved": true,
+    "permission_hook_neutral": true,
+    "runtime_mode": "0700",
+    "manifest_mode": "0600",
+    "real_user_state_written": false
   },
   "source_audit": "allowlist/private-state filenames/personal paths/common device URLs and GitHub token patterns passed; not a universal secret guarantee",
   "remote_ci_run": false,
@@ -23,6 +33,27 @@
   "real_claude_session_tested": false,
   "current_user_phone_data_included": false,
   "license": "MIT",
-  "verification_stage": "local checks before first public push",
-  "remote_ci_result": "See GitHub Actions checks for the current commit"
+  "verification_stage": "local package and runtime checks before prerelease publication",
+  "remote_ci_result": "See GitHub Actions checks for the exact source commit",
+  "video": {
+    "audio_tracks": 0,
+    "decode_completed": true,
+    "duration_seconds": 30,
+    "fps": 24,
+    "frames": 720,
+    "height": 720,
+    "width": 1280
+  },
+  "bundled_python": "3.13.18, fixed upstream archive SHA-256; runtime and vendored licenses included",
+  "gatekeeper": "spctl rejected as expected: ad-hoc signed, no Developer ID or notarization; fresh downloaded quarantine flow not tested",
+  "release_assets": {
+    "Bark-Bridge-2.5.0-macOS-arm64-preview.zip": {
+      "sha256": "604bf3770ee610fc33669b3499d00ab02572986e3edb6af01ba98ce12759872d",
+      "bytes": 32001212
+    },
+    "Bark-Bridge-30s-demo.mp4": {
+      "sha256": "d50658426babfa080e3993123b7aae173401ea22d3202ef0b549872f440e931a",
+      "bytes": 2766776
+    }
+  }
 }

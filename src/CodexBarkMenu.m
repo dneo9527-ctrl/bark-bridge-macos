@@ -14,13 +14,17 @@ static NSString *Support(void) {
     return [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/CodexBark"];
 #endif
 }
+static NSString *Python(void) {
+    NSString *bundled = [Support() stringByAppendingPathComponent:@"python/bin/python3"];
+    return [NSFileManager.defaultManager isExecutableFileAtPath:bundled] ? bundled : @"/usr/bin/python3";
+}
 static NSString *LoginFile(void) { return [NSHomeDirectory() stringByAppendingPathComponent:@"Library/LaunchAgents/local.codex.bark.menu.plist"]; }
 static NSUInteger MemoryMB(void) {
     mach_task_basic_info_data_t info; mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
     return task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) == KERN_SUCCESS ? info.resident_size / 1024 / 1024 : 0;
 }
 static NSDictionary *Backend(NSArray *arguments) {
-    NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/python3"];
+    NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:Python()];
     task.arguments = [@[[Support() stringByAppendingPathComponent:@"bark.py"]] arrayByAddingObjectsFromArray:arguments];
     NSPipe *pipe = [NSPipe pipe]; task.standardOutput = pipe; task.standardError = NSFileHandle.fileHandleWithNullDevice;
     task.standardInput = NSFileHandle.fileHandleWithNullDevice;
@@ -137,7 +141,7 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
     if (!shouldDispatch) return;
     [self writeState];
     dispatch_async(self.batteryQueue, ^{
-        NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/python3"];
+        NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:Python()];
         task.arguments = @[[Support() stringByAppendingPathComponent:@"bark.py"], @"battery-event"];
         NSPipe *input = [NSPipe pipe]; task.standardInput = input;
         task.standardOutput = NSFileHandle.fileHandleWithNullDevice; task.standardError = NSFileHandle.fileHandleWithNullDevice;

@@ -11,9 +11,16 @@ import selectors
 import shutil
 import sqlite3
 import subprocess
+import sys
 import time
 
 BASE = Path(__file__).resolve().parent
+
+
+def python_executable():
+    bundled = BASE / "python/bin/python3"
+    return str(bundled) if bundled.is_file() else "/usr/bin/python3"
+
 MANIFEST = BASE / "installation.json"
 def discover_codex_cli():
     override = os.environ.get("CODEX_CLI_BIN")
@@ -33,8 +40,20 @@ def discover_codex_cli():
 EXE = discover_codex_cli()
 START = "# BEGIN CODEX BARK SHARED HOOK TRUST"
 END = "# END CODEX BARK SHARED HOOK TRUST"
-CMD = "/usr/bin/python3 " + shlex.quote(str(BASE / "bark.py")) + " hook"
+CMD = shlex.quote(python_executable()) + " " + shlex.quote(str(BASE / "bark.py")) + " hook"
 QUESTION_MATCHER = r"(^|__|\.)(request_user_input|request_user_input_async|ask_user|ask_user_question)$"
+
+
+def is_our_command(command):
+    if not isinstance(command, str): return False
+    try:
+        tokens = shlex.split(command)
+        return (len(tokens) == 3 and tokens[0] in {"/usr/bin/python3", str(BASE / "python/bin/python3")}
+                and Path(tokens[1]).is_absolute()
+                and Path(tokens[1]).resolve() == (BASE / "bark.py").resolve()
+                and tokens[2] == "hook")
+    except (ValueError, OSError):
+        return False
 
 
 def atomic(path, text, mode=0o600):
@@ -305,7 +324,7 @@ def support_report(snapshot_provider=None, health_provider=None):
     """On-demand allowlisted diagnostics; never export paths, names or content."""
     if snapshot_provider is None:
         def snapshot_provider():
-            p = subprocess.run(["/usr/bin/python3", str(BASE / "bark.py"), "snapshot", "--view", "history"],
+            p = subprocess.run([python_executable(), str(BASE / "bark.py"), "snapshot", "--view", "history"],
                                capture_output=True, timeout=5)
             return json.loads(p.stdout) if p.returncode == 0 else {}
     try: snap = snapshot_provider()
@@ -427,6 +446,10 @@ def attach(home, with_cc_switch=False):
     ]
     for event, matcher, asynchronous, label in entries:
         groups = h["hooks"].setdefault(event, [])
+        for group in groups:
+            for hook in group.get("hooks", []):
+                if is_our_command(hook.get("command")):
+                    hook["command"] = CMD
         if any(x.get("command") == CMD for g in groups for x in g.get("hooks", [])):
             continue
         group = {"hooks": [{"type": "command", "command": CMD, "async": asynchronous,
@@ -504,7 +527,7 @@ def remove_own_trust(text, records):
 def uninstall():
     adapter = BASE / "claude_bark.py"
     if adapter.is_file():
-        result = subprocess.run(["/usr/bin/python3", str(adapter), "detach"], capture_output=True, timeout=5)
+        result = subprocess.run([python_executable(), str(adapter), "detach"], capture_output=True, timeout=5)
         try: detached = json.loads(result.stdout)
         except ValueError: detached = {}
         if detached.get("ok") is not True:
@@ -519,7 +542,7 @@ def uninstall():
             for event in list(h.get("hooks", {})):
                 groups = h["hooks"][event]
                 for g in groups:
-                    g["hooks"] = [x for x in g.get("hooks", []) if x.get("command") != CMD]
+                    g["hooks"] = [x for x in g.get("hooks", []) if not is_our_command(x.get("command"))]
                 h["hooks"][event] = [g for g in groups if g["hooks"]]
                 if not h["hooks"][event]:
                     del h["hooks"][event]

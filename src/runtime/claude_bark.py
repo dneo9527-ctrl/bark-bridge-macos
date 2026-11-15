@@ -49,14 +49,14 @@ def script_path() -> Path:
 
 
 def hook_command() -> str:
-    return f"/usr/bin/python3 {shlex.quote(str(script_path()))} hook"
+    return f"{shlex.quote(bark.python_executable())} {shlex.quote(str(script_path()))} hook"
 
 
 def is_our_command(cmd: Any) -> bool:
     if not isinstance(cmd, str): return False
     try: tokens = shlex.split(cmd.strip())
     except ValueError: return False
-    return tokens == ["/usr/bin/python3", str(script_path()), "hook"]
+    return len(tokens) == 3 and tokens[0] in {"/usr/bin/python3", str(BASE / "python/bin/python3")} and tokens[1:] == [str(script_path()), "hook"]
 
 
 def settings_path() -> Path:

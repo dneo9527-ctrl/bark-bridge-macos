@@ -7,3 +7,14 @@
 公开源码候选另行运行仓库测试与本机构建，具体结果见仓库 release-check.json。测试仅使用仓库源码和临时文件；真实 Codex CLI 的隔离接入测试默认跳过，只有显式 BARK_RUN_CODEX_INTEGRATION=1 时启用。远端 CI 结果请查看 [对应提交的 Actions 记录](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)，本地测试结果不替代远端检查。
 
 尚未验证：真实 Claude Code 会话、Intel Mac、macOS 13 上的实机表现、第二实体手机、公开下载后二进制 Gatekeeper 行为、Developer ID 公证、长期耗电和新版本长期睡眠/离线稳定性。本候选不承诺这些未测场景。
+
+
+## 2.5.0 安装预览
+
+新增 Apple Silicon 图形首次安装助手，内嵌 python-build-standalone 3.13.18。下载归档先校验固定 SHA-256，保留上游 Python 与依赖许可；包体从公开源码与固定运行时构建，不读取现有安装的手机配置。安装目标有已有文件或符号链接时停止。
+
+隔离目录已实际完成：复制 App 与 Python、执行内置 Python 状态查询、验证 App 深层签名、拒绝二次安装；真实本机 Codex CLI 对临时 CODEX_HOME 合并并信任四条 Hook，保留原授权策略及第三方 Hook；权限事件入口返回空输出，不产生审批决定。其他测试涵盖失败时保留备份、部分 App 拷贝清理及双解释器 Hook 清理。
+
+安装包采用 ad-hoc 签名，`codesign --verify --deep --strict` 成功；`spctl --assess` 拒绝，符合未公证预览的状态，不将本机构建可运行等同于网上下载后可直接打开。没有 Developer ID、公证及全新 Mac 隔离属性后的首次打开实测。旧 macOS、Intel 和完整新用户首次手机送达仍未验证。
+
+30 秒演示是 1280×720 H.264 无声字幕动画，使用虚构聊天与手机界面，全片标注功能示意；不作为实际 App 录屏或手机实收证据。

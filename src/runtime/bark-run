@@ -7,5 +7,7 @@ fi
 "$@"
 bark_task_exit=$?
 bark_run_base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-/usr/bin/python3 "$bark_run_base/bark.py" template-notify --template terminal --exit-code "$bark_task_exit" </dev/null >/dev/null 2>&1 &
+bark_python="$bark_run_base/python/bin/python3"
+[ -x "$bark_python" ] || bark_python=/usr/bin/python3
+"$bark_python" "$bark_run_base/bark.py" template-notify --template terminal --exit-code "$bark_task_exit" </dev/null >/dev/null 2>&1 &
 exit "$bark_task_exit"
