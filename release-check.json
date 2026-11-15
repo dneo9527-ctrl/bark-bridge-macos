@@ -73,7 +73,7 @@
       "bytes": 89
     }
   },
-  "publication": "not published in this chat; user requested handoff to GitHub publishing chat",
+  "publication": "Local build evidence for 45d4034a8a833b03dc5f63eae1270fc075108936; publication and exact-SHA CI are recorded separately in the GitHub Release.",
   "remote_ci_run": false,
   "unverified": [
     "real public network version-to-version download/install",

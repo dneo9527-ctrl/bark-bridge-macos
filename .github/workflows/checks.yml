@@ -7,7 +7,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Isolated tests
         run: /usr/bin/python3 scripts/test.py
       - name: Source release audit

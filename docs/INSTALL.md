@@ -2,11 +2,11 @@
 
 [← 返回项目首页](../README.md)
 
-当前为 **2.5.0 开发者安装预览**。提供 Apple Silicon 图形安装包及源码构建两种方式；都只支持首次安装，不覆盖已有安装。
+当前为 **2.6.0 开发者预览**。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
 
 ## 下载图形安装预览
 
-1. 下载 [Release 中的 Apple Silicon ZIP](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.5.0-preview.1)，解压后先阅读 `Start Here.html`。
+1. 下载 [Release 中的 Apple Silicon ZIP](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0-preview.1)，解压后先阅读 `Start Here.html`。
 2. 打开 `Install Bark Bridge.app`，查看安装位置与 Codex 接入选项，再点击“安装并打开”。此包内置 Python，无需自行安装 Xcode、Python 或 pip。
 3. 安装完成后添加接收设备，在 iPhone 上确认收到测试。未找到 Codex CLI 时可先安装 App，稍后按下文接入。
 
@@ -15,6 +15,10 @@
 安装到 `/Applications/Bark.app`，共用运行目录为 `~/Library/Application Support/CodexBark`；需要当前用户对 Applications 有写权限，不自动请求 sudo。已有 App、运行目录或指向它们的符号链接都会阻止安装。安装助手不会升级已有用户版本。
 
 嵌入式 Python 固定为 python-build-standalone 3.13.18（20261110），下载哈希见 `assets/python-runtime.json`。运行时和许可一起复制到共用目录，Hook、Skill、菜单及面板优先使用它。源码首次安装仍可使用系统 Python。
+
+## 已有 2.4.x / 2.5.x 安装
+
+这些版本没有更新公钥入口，当前没有面向旧版的一键迁移工具。请继续使用原版，不用首次安装助手覆盖，也不手动复制未知程序文件。需要迁移指导时，可在 [Issues](https://github.com/dneo9527-ctrl/bark-bridge-macos/issues) 提供版本号、macOS 版本与架构；不要上传设备地址、配置、日志、聊天或备份。维护者核对旧安装结构后再提供针对性的备份与回退步骤。本机一次受控源码迁移成功不代表所有旧安装已验证。
 
 ## 获取源码
 
@@ -57,7 +61,7 @@ cd bark-bridge-macos
 open /Applications/Bark.app
 ```
 
-安装器只支持首次安装；发现已有 Bark App 或共用运行目录会停止，防止覆盖其他安装。构建或测试不会调用安装器，也不触碰现有手机配置。未提供自动更新功能。
+安装器只支持首次安装；发现已有 Bark App 或共用运行目录会停止，防止覆盖其他安装。构建或测试不会调用安装器，也不触碰现有手机配置。2.6.0 起的设置页可检查更新和选择自动下载，下载校验后由用户确认重启安装，见 [软件更新](UPDATES.md)。较早版没有这个入口，需先按维护者指导备份并启用可信客户端；不能用首次安装助手覆盖升级。
 
 如果首次安装中途失败，安装器可能已移除 App，但会保留共用运行目录和失败备份；不要反复运行 `--apply`。修正 CLI 路径或其他错误后，先把失败的共用目录移到另一安全位置保留备份，确认 `/Applications/Bark.app` 不存在，再重新首次安装。该步骤只适用于已失败且未投入使用的安装，不要移动仍在使用的运行目录。
 
