@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build locally for this Mac. Does not install or launch the app."""
 import argparse
+import json
 import platform
 import plistlib
 from pathlib import Path
@@ -28,9 +29,15 @@ def main():
         shutil.copy2(ROOT / 'assets/AppIcon.icns', bundle / 'Contents/Resources/AppIcon.icns')
         info = dict(CFBundleName='Bark', CFBundleDisplayName='Bark', CFBundlePackageType='APPL',
                     CFBundleExecutable=executable, CFBundleIdentifier=identifier, CFBundleIconFile='AppIcon',
-                    CFBundleShortVersionString=version, CFBundleVersion='45', LSMinimumSystemVersion='13.0',
+                    CFBundleShortVersionString=version, CFBundleVersion='46', LSMinimumSystemVersion='13.0',
                     LSUIElement=accessory, LSMultipleInstancesProhibited=True, NSHighResolutionCapable=True)
         (bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
+        (bundle / 'Contents/Resources/release.json').write_text(json.dumps({
+            'tag': 'v' + version + '-preview.1', 'channel': 'preview', 'update_protocol': 1}) + '\n')
+    shutil.copy2(ROOT / 'assets/update-public-key.txt', app / 'Contents/Resources/update-public-key.txt')
+    subprocess.run(['/usr/bin/xcrun', 'swiftc', '-O', '-target', args.arch+'-apple-macos13.0',
+                    str(ROOT / 'src/BarkUpdateVerifier.swift'), '-o', str(app / 'Contents/Helpers/BarkUpdateVerifier')], check=True)
+    subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-', str(app / 'Contents/Helpers/BarkUpdateVerifier')], check=True)
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-O', '-target', args.arch+'-apple-macos13.0',
                     '-framework', 'AppKit', '-framework', 'UniformTypeIdentifiers',
                     str(ROOT / 'src/CodexBark.swift'), '-o', str(panel / 'Contents/MacOS/CodexBarkPanel')], check=True)

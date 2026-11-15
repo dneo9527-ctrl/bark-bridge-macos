@@ -55,7 +55,7 @@ def main():
     payload = resources / 'Payload'; payload.mkdir()
     shutil.copytree(ROOT / 'build/Bark.app', payload / 'Bark.app', symlinks=True)
     (payload / 'runtime').mkdir()
-    for name in ['bark.py', 'manage.py', 'claude_bark.py', 'bark-run']:
+    for name in ['bark.py', 'manage.py', 'claude_bark.py', 'bark-run', 'updater.py']:
         shutil.copy2(ROOT / 'src/runtime' / name, payload / 'runtime' / name)
     shutil.copy2(ROOT / 'assets/SKILL.md.in', payload / 'SKILL.md.in')
     shutil.copy2(ROOT / 'scripts/install.py', payload / 'install.py')
@@ -72,7 +72,7 @@ def main():
     info = dict(CFBundleName='Install Bark Bridge', CFBundleDisplayName='Install Bark Bridge',
                 CFBundleExecutable='BarkBridgeInstaller', CFBundleIdentifier='local.codex.bark.installer',
                 CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString=version,
-                CFBundleVersion='45', LSMinimumSystemVersion='13.0', NSHighResolutionCapable=True)
+                CFBundleVersion='46', LSMinimumSystemVersion='13.0', NSHighResolutionCapable=True)
     (installer / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-O', '-target', 'arm64-apple-macos13.0', '-framework', 'AppKit', str(ROOT / 'src/BarkInstaller.swift'), '-o', str(binaries / 'BarkBridgeInstaller')], check=True)
     sign(installer)

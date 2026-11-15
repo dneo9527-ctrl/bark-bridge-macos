@@ -34,7 +34,7 @@ def install(app, base, codex_home=None, with_cc_switch=False, payload=None):
     app_created = False
     app_identity = None
     try:
-        for name in ['bark.py', 'manage.py', 'claude_bark.py', 'bark-run']:
+        for name in ['bark.py', 'manage.py', 'claude_bark.py', 'bark-run', 'updater.py']:
             shutil.copy2(runtime / name, base / name)
             (base / name).chmod(0o700)
         if payload:

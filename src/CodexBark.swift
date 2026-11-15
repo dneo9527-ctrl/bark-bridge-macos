@@ -15,7 +15,7 @@ let barkScriptCommand = shellQuote(pythonURL.path) + " " + shellQuote(support.ap
 let taskWrapperCommand = shellQuote(support.appendingPathComponent("bark-run").path)
 let installedAppURL = URL(fileURLWithPath: "/Applications/Bark.app")
 
-func backend(_ args: [String], input: Data? = nil, script: String = "bark.py") -> [String: Any] {
+func backend(_ args: [String], input: Data? = nil, script: String = "bark.py", timeout: Double = 30) -> [String: Any] {
     let p = Process()
     p.executableURL = pythonURL
     p.arguments = [support.appendingPathComponent(script).path] + args
@@ -27,7 +27,7 @@ func backend(_ args: [String], input: Data? = nil, script: String = "bark.py") -
     do {
         try p.run()
         let deadline = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
-        deadline.schedule(deadline: .now() + 30)
+        deadline.schedule(deadline: .now() + timeout)
         deadline.setEventHandler { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
         deadline.resume()
         defer { deadline.cancel() }
@@ -206,6 +206,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     var startupSwitch: NSSwitch?
     var residentSwitch: NSSwitch?
     var batterySwitch: NSSwitch?
+    var updateSwitch: NSSwitch?
+    var updateButton: NSButton?
+    var updateLabel: NSTextField?
+    var updateState: [String: Any] = [:]
+    var updateBusy = false
+    let updateQueue = DispatchQueue(label: "local.codex.bark.panel.updates", qos: .utility)
     var modeHint: NSTextField?
     var resumeAt: Double = 0
     var configured = false
@@ -248,6 +254,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     let panelOnly = Bundle.main.bundleIdentifier == "local.codex.bark.panel" || ProcessInfo.processInfo.arguments.contains("--panel-only")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let index = CommandLine.arguments.firstIndex(of: "--render-settings"), index + 1 < CommandLine.arguments.count {
+            NSApp.setActivationPolicy(.prohibited)
+            selectedPage = 2; configured = true; enabled = true
+            makeWindow(); window?.setFrameOrigin(NSPoint(x: -15000, y: -15000))
+            if let view = window?.contentView {
+                view.layoutSubtreeIfNeeded()
+                if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    try? bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+                }
+            }
+            NSApp.terminate(nil); return
+        }
         NSApp.setActivationPolicy(panelOnly ? .regular : .accessory)
         if let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleIconFile") as? String, let url = Bundle.main.url(forResource: name, withExtension: "icns"), let icon = NSImage(contentsOf: url) { NSApp.applicationIconImage = icon }
         installMainMenu()
@@ -265,6 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         else { showWindow(nil) }
         if !panelOnly { rebuildMenu(item.menu!) }
         if ProcessInfo.processInfo.arguments.contains("--page=devices") { showDevices() }
+        refreshUpdates()
     }
 
     var zeroResident: Bool { preferences.bool(forKey: "zeroResidentMode") }
@@ -302,6 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func applicationDidBecomeActive(_ notification: Notification) {
         guard panelOnly else { return }
+        refreshUpdates()
         if window != nil { reload() }
         if let device = deviceWindow, device.isVisible {
             device.makeKeyAndOrderFront(nil)
@@ -557,6 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func selectPage(_ sender: NavigationStrip) {
         selectedPage = [0, 3, 1, 2][sender.selectedSegment]
         reload(); buildPage(); updateWindow()
+        if selectedPage == 2 { refreshUpdates() }
     }
 
     func buildPage() {
@@ -566,6 +588,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         sourceTable = nil; historyTable = nil; historyScrollHeight = nil; presetButton = nil
         historyResultPopup = nil; historySourcePopup = nil; historyCountLabel = nil; quietButton = nil; healthButton = nil
         startupSwitch = nil; residentSwitch = nil; batterySwitch = nil; modeHint = nil
+        updateSwitch = nil; updateButton = nil; updateLabel = nil
         let content: NSView
         var bodyHeight: CGFloat = 192
         switch selectedPage {
@@ -631,9 +654,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             healthButton = button("接入自检", #selector(checkHealth), link: true)
             healthButton!.setAccessibilityLabel("接入自检")
             let footer = row([healthButton!, button("诊断报告", #selector(createSupportReport), link: true), spacer(), button("关于", #selector(showAbout), link: true), button("高级…", #selector(showAdvanced(_:)), link: true)], spacing: 12)
-            content = column([box, footer], spacing: 12)
-            bodyHeight = 168
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+            updateButton = button("检查更新", #selector(updateAction))
+            let updateTitle = row([label("软件更新", size: 13, weight: .medium), spacer(), updateButton!])
+            let versionRow = label("当前版本 \(version) · Build \(build)", size: 12, color: .secondaryLabelColor)
+            updateLabel = label("可从 GitHub 检查新版本", size: 11, color: .secondaryLabelColor)
+            updateSwitch = NSSwitch(); updateSwitch!.controlSize = .small
+            updateSwitch!.target = self; updateSwitch!.action = #selector(toggleAutoUpdate)
+            updateSwitch!.setAccessibilityLabel("自动下载更新")
+            let autoRow = row([label("自动下载更新", size: 13), spacer(), updateSwitch!])
+            let hint = label("每 12 小时检查，下载后由你确认重启安装。", size: 11, color: .secondaryLabelColor)
+            let links = row([button("GitHub ↗", #selector(openRepository), link: true), button("更新日志 ↗", #selector(openReleases), link: true), spacer()], spacing: 12)
+            let updates = column([updateTitle, versionRow, updateLabel!, rule(), autoRow, hint, links], spacing: 9)
+            for view in updates.arrangedSubviews { view.widthAnchor.constraint(equalTo: updates.widthAnchor).isActive = true }
+            let updateBox = card(updates)
+            content = column([box, updateBox, footer], spacing: 12)
+            bodyHeight = 365
             box.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            updateBox.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             footer.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         case 3:
             let add = button("添加应用", #selector(addApplications), link: true)
@@ -733,6 +772,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func updateWindow() {
+        updateSoftwareControls()
         var pausedText = "已暂停"
         if resumeAt > Date().timeIntervalSince1970 {
             let date = DateFormatter(); date.dateFormat = "HH:mm"
@@ -781,6 +821,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     @objc func changeResident() { toggleLowMemory(); buildPage(); updateWindow() }
+    func refreshUpdates(_ args: [String] = ["status"]) {
+        guard !updateBusy else { return }
+        updateBusy = true; updateSoftwareControls()
+        updateQueue.async {
+            let result = backend(args, script: "updater.py", timeout: 240)
+            DispatchQueue.main.async {
+                self.updateBusy = false
+                if result["ok"] as? Bool == true { self.updateState = result }
+                else { self.updateState["error"] = result["error"] as? String ?? "update_failed" }
+                self.updateSoftwareControls()
+                if args.first == "automatic" {
+                    DistributedNotificationCenter.default().postNotificationName(.init("CodexBarkUpdatePreferenceChanged"), object: nil, userInfo: nil, deliverImmediately: true)
+                }
+                if args.first == "start", result["started"] as? Bool == true { NSApp.terminate(nil) }
+            }
+        }
+    }
+    func updateSoftwareControls() {
+        updateSwitch?.state = updateState["automatic"] as? Bool == true ? .on : .off
+        updateSwitch?.isEnabled = !updateBusy
+        let status = updateState["status"] as? String ?? ""
+        updateButton?.title = updateBusy ? "处理中…" : (status == "ready" ? "重启并更新" : (status == "available" ? "下载更新" : "检查更新"))
+        updateButton?.isEnabled = !updateBusy
+        if updateBusy { updateLabel?.stringValue = "正在处理更新，请稍候…"; return }
+        if let error = updateState["error"] as? String {
+            let texts = ["signature_invalid":"发布签名未通过，已停止更新", "checksum_mismatch":"下载校验未通过，请重试", "rate_limited":"GitHub 请求受限，请稍后重试", "busy":"更新任务正在运行，请稍后检查", "update_rolled_back":"更新未完成，已恢复原版本", "recovery_required":"上次更新待恢复，请重新打开 Bark", "install_permission":"应用目录不可写，请检查权限"]
+            updateLabel?.stringValue = texts[error] ?? "更新未完成，请检查网络后重试"
+            return
+        }
+        let tag = updateState["tag"] as? String ?? ""
+        switch status {
+        case "ready": updateLabel?.stringValue = "\(tag) 已下载，发布签名与文件校验通过"
+        case "available": updateLabel?.stringValue = "发现新版本 \(tag)"
+        case "current": updateLabel?.stringValue = "当前已是最新可用版本"
+        case "no_compatible_release": updateLabel?.stringValue = "暂未发布适用的更新包"
+        default: updateLabel?.stringValue = "可从 GitHub 检查新版本"
+        }
+    }
+    @objc func toggleAutoUpdate() {
+        refreshUpdates(["automatic", updateSwitch?.state == .on ? "on" : "off"])
+    }
+    @objc func updateAction() {
+        switch updateState["status"] as? String ?? "" {
+        case "ready": refreshUpdates(["start", "--parent-pid", String(getpid())])
+        case "available": refreshUpdates(["download"])
+        default: refreshUpdates(["check"])
+        }
+    }
+    @objc func openRepository() { NSWorkspace.shared.open(URL(string: "https://github.com/dneo9527-ctrl/bark-bridge-macos")!) }
+    @objc func openReleases() { NSWorkspace.shared.open(URL(string: "https://github.com/dneo9527-ctrl/bark-bridge-macos/releases")!) }
     @objc func openSettings() { navigate(to: 2) }
     func navigate(to page: Int) {
         selectedPage = page; showWindow(nil)

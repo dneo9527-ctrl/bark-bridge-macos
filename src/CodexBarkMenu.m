@@ -81,6 +81,8 @@ static BOOL BatteryBoundary(NSInteger prior, BOOL wasAC, NSInteger percent, BOOL
 @property dispatch_queue_t backendQueue;
 @property NSMenu *contextMenu;
 @property NSTimer *resumeTimer;
+@property NSTimer *updateTimer;
+@property BOOL updateRunning;
 @property NSTimeInterval resumeAt;
 @end
 
@@ -100,16 +102,65 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(modeChanged:) name:@"CodexBarkModeChanged" object:nil];
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(restore:) name:@"CodexBarkRestoreIcon" object:nil];
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(settingsChanged:) name:@"CodexBarkSettingsChanged" object:nil];
+    [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(updatePreferenceChanged:) name:@"CodexBarkUpdatePreferenceChanged" object:nil];
     BOOL hidden = [prefs boolForKey:@"zeroResidentMode"];
     if (!hidden) [self createStatus];
     self.powerSource = IOPSNotificationCreateRunLoopSource(PowerChanged, (__bridge void *)self);
     if (self.powerSource) CFRunLoopAddSource(CFRunLoopGetMain(), self.powerSource, kCFRunLoopCommonModes);
     [self reload];
+    // A short lived updater recovers interrupted transactions before the readiness receipt.
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSDictionary *recovery = [self runUpdater:@[@"recover"]];
+        if ([recovery[@"recovered"] boolValue]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *binary = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Contents/MacOS/CodexBarkMenu"];
+                execl(binary.fileSystemRepresentation, binary.fileSystemRepresentation, "--background", NULL);
+                [NSApp terminate:nil];
+            });
+            return;
+        }
+        if (![recovery[@"ok"] boolValue]) return;
+        NSString *releasePath = [NSBundle.mainBundle pathForResource:@"release" ofType:@"json"];
+        NSDictionary *release = [NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:releasePath] options:0 error:nil];
+        NSDictionary *receipt = @{@"tag": release[@"tag"] ?: @"", @"pid": @(getpid())};
+        NSString *directory = [Support() stringByAppendingPathComponent:@"updates"];
+        [NSFileManager.defaultManager createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:nil];
+        NSData *data = [NSJSONSerialization dataWithJSONObject:receipt options:0 error:nil];
+        [data writeToFile:[directory stringByAppendingPathComponent:@"ready.json"] atomically:YES];
+        [NSFileManager.defaultManager setAttributes:@{NSFilePosixPermissions:@0600} ofItemAtPath:[directory stringByAppendingPathComponent:@"ready.json"] error:nil];
+        dispatch_async(dispatch_get_main_queue(), ^{ [self updatePreferenceChanged:nil]; });
+    });
     if (!background) [self openPanel:nil];
 
     dispatch_async(dispatch_get_main_queue(), ^{ [self writeState]; });
 }
-- (void)powerDidWake:(NSNotification *)notification { self.lastBatteryPercent = -1; [self checkBattery]; }
+- (void)powerDidWake:(NSNotification *)notification { self.lastBatteryPercent = -1; [self checkBattery]; [self scheduleUpdateCheck]; }
+- (NSDictionary *)runUpdater:(NSArray *)arguments {
+    NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:Python()];
+    task.arguments = [@[@"-I", @"-B", [Support() stringByAppendingPathComponent:@"updater.py"]] arrayByAddingObjectsFromArray:arguments];
+    NSPipe *output = [NSPipe pipe];
+    task.standardInput = NSFileHandle.fileHandleWithNullDevice; task.standardOutput = output; task.standardError = NSFileHandle.fileHandleWithNullDevice;
+    if (![task launchAndReturnError:nil]) return @{};
+    NSData *data = [output.fileHandleForReading readDataToEndOfFile]; [task waitUntilExit];
+    id result = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    return [result isKindOfClass:NSDictionary.class] ? result : @{};
+}
+- (void)updatePreferenceChanged:(NSNotification *)note {
+    [self.updateTimer invalidate]; self.updateTimer = nil;
+    NSData *data = [NSData dataWithContentsOfFile:[Support() stringByAppendingPathComponent:@"updates/preferences.json"]];
+    NSDictionary *prefs = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    if (![prefs[@"automatic"] isEqual:@YES]) return;
+    self.updateTimer = [NSTimer scheduledTimerWithTimeInterval:12*3600 target:self selector:@selector(scheduleUpdateCheck) userInfo:nil repeats:YES];
+    self.updateTimer.tolerance = 300;
+    [self scheduleUpdateCheck];
+}
+- (void)scheduleUpdateCheck {
+    if (self.updateRunning) return; self.updateRunning = YES;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        [self runUpdater:@[@"check", @"--due", @"--download"]];
+        dispatch_async(dispatch_get_main_queue(), ^{ self.updateRunning = NO; });
+    });
+}
 - (void)applicationWillTerminate:(NSNotification *)notification {
     if (self.powerSource) {
         CFRunLoopRemoveSource(CFRunLoopGetMain(), self.powerSource, kCFRunLoopCommonModes);
@@ -479,6 +530,11 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        if ([NSProcessInfo.processInfo.arguments containsObject:@"--update-smoke-check"]) {
+            NSDictionary *result = @{@"version": [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @""};
+            NSData *data = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
+            puts([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String); return 0;
+        }
         NSString *lockPath = [Support() stringByAppendingPathComponent:@".menu-instance.lock"];
         int instanceLock = open(lockPath.fileSystemRepresentation, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
         if (instanceLock < 0 || flock(instanceLock, LOCK_EX | LOCK_NB) != 0) return 0;

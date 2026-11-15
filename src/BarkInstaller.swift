@@ -74,7 +74,8 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         icon.widthAnchor.constraint(equalToConstant: 64).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 64).isActive = true
         let title = label("从 Mac，连接到你的手机。", size: 25, weight: .semibold)
-        let subtitle = label("Bark Bridge 2.5.0 · Apple Silicon 安装预览", secondary: true)
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let subtitle = label("Bark Bridge \(version) · Apple Silicon 安装预览", secondary: true)
         let header = NSStackView(views: [title, subtitle]); header.orientation = .vertical; header.alignment = .leading; header.spacing = 7
         let hero = NSStackView(views: [icon, header]); hero.spacing = 18; hero.alignment = .centerY
         let divider = NSBox(); divider.boxType = .separator

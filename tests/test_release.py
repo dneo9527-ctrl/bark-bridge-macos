@@ -101,7 +101,7 @@ class ReleaseTests(unittest.TestCase):
         (payload/'Bark.app/Contents/Info.plist').write_bytes(plistlib.dumps({
             'CFBundleIdentifier': 'local.codex.bark.menu', 'CFBundleShortVersionString': '2.5.0'}))
         (payload/'runtime').mkdir()
-        for name in ['bark.py','manage.py','claude_bark.py','bark-run']:
+        for name in ['bark.py','manage.py','claude_bark.py','bark-run','updater.py']:
             (payload/'runtime'/name).write_text('# public fixture\n')
         (payload/'SKILL.md.in').write_text('@BARK_PYTHON@ "@BARK_BASE@/bark.py" wait')
         (payload/'python/bin').mkdir(parents=True)
