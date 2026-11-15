@@ -26,7 +26,10 @@ def audit():
     checked = []
     for path in source_files():
         rel = str(path.relative_to(ROOT))
-        if path.suffix != '.icns':
+        if path.suffix == '.png':
+            if rel != 'docs/media/app-icon.png' or path.stat().st_size > 524288 or not path.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'):
+                raise ValueError('Unapproved binary image: '+rel)
+        elif path.suffix != '.icns':
             text = path.read_text()
             if '/Users/'+'m/' in text or '/Applications/'+'学习/' in text:
                 raise ValueError('Machine-specific path: '+rel)

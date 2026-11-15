@@ -1,151 +1,113 @@
-# Bark Bridge for Mac
+<div align="center">
+  <img src="docs/media/app-icon.png" width="96" height="96" alt="Bark Bridge 陶瓷铃铛图标">
+  <h1>Bark Bridge for Mac</h1>
+  <p><strong>电脑继续忙，需要你时手机提醒。</strong></p>
+  <p>把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。<br>同一 Mac 用户共用设备配置，现有接入目录换号继续用。</p>
+  <p>
+    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml"><img src="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml/badge.svg" alt="macOS 测试与构建状态"></a>
+    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1"><img src="https://img.shields.io/badge/2.4.1-source_preview-2563eb?style=flat-square" alt="2.4.1 源码预览版"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0f766e?style=flat-square" alt="MIT 许可证"></a>
+  </p>
+  <p><a href="#快速开始">快速开始</a> · <a href="docs/INSTALL.md">安装与接入</a> · <a href="docs/PRIVACY.md">隐私说明</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1">下载源码</a></p>
+</div>
 
-将 Mac 上需要处理的 Codex 提醒发送到 iPhone Bark。一个 macOS 用户共用一份手机配置，支持菜单栏开关、多设备和按来源路由。
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/media/overview-mobile.svg">
+  <img src="docs/media/overview.svg" width="1320" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。">
+</picture>
 
-这是独立制作的社区工具，与 Bark、OpenAI、Anthropic 无官方关联。
+> **当前为源码预发布。** 需要在 Mac 本地构建；尚未提供经过 Developer ID 公证的预编译安装包。以下介绍的是现有功能，插图为示意。
 
-**2.4.1 · MIT 许可证 · 源码预发布。**
+## 离开电脑，也知道下一步
 
-## 它解决什么问题
+- **需要你时提醒。** 授权、提问／选择、本轮完成三类提醒分别控制，支持带聊天名及短问题预览。
+- **配置一次，现有换号继续用。** 同一 macOS 用户共用手机地址，Mac 换 Codex 账号时，iPhone Bark 无需改配置。新的独立 CODEX_HOME 需接入一次。
+- **由你决定发给谁、何时安静。** 记忆多台手机，按来源分配设备；也能暂停、临时静音或设置每日勿扰。
 
-离开 Mac 后，Codex 可能正等你授权或回答。Bark Bridge 把这些需要处理的时刻推送到 iPhone，让你知道是哪个聊天需要关注；本轮完成时也可以提醒。
+手机负责显示提醒，实际回答和审批仍在 Mac 上完成。Bark Bridge 不改变操作授权策略，也不自动批准请求。
 
-同一个 macOS 用户共用一份接收设备配置。现有已接入目录切换 Codex 账号时，无需重复填写手机地址，iPhone 也无需跟着切换 ChatGPT 账号。新的独立 CODEX_HOME 仍需接入一次。
+## 现有功能
 
-## 功能一览
-
-| 场景或功能 | 能做什么 |
+| 你想做什么 | Bark Bridge 如何帮助 |
 | --- | --- |
-| 等待授权 | 提醒返回 Mac 查看请求并决定，包含聊天名和工具，不发送授权命令 |
-| 等待回答或选择 | 支持的提问工具发送短问题和选项；普通文字提问由本地 Skill 尽力补充 |
-| 本轮完成 | 主线程本轮回复结束后提醒，三类 Codex 提醒可分别开关 |
-| 多台手机 | 记忆接收设备，独立启停，并按来源分配接收手机 |
-| 安静时段 | 每日勿扰、全局暂停和单来源临时静音，跳过后不积压补发 |
-| 场景预设 | “需要我时”“离开电脑”“专注片刻”组合现有提醒开关；不会自动判断你是否离开 |
-| Mac 电池 | 未接电源时的低电量提醒，监听系统电源事件 |
-| 终端与快捷指令 | 显式包装的长任务结束提醒，以及 Mac 快捷指令末尾调用模板 |
-| 发送记录与诊断 | 查看来源、各设备的网关发送结果和脱敏错误类别 |
-| Claude Code（实验性） | PermissionRequest、AskUserQuestion、Stop 适配；只完成配置合并与隔离测试，尚未验证真实会话 |
+| 找到需要处理的聊天 | 支持的授权、提问、完成事件可带聊天名；名称无法确定时保留短编号，避免串名 |
+| 看清问题与选项 | 支持短问题和选项预览；可关闭手机内容预览 |
+| 选择接收手机 | 保存多台设备，独立启停，并按来源路由；指定设备已停用时跳过，不改投其他设备 |
+| 少受打扰 | 全局暂停、单来源临时静音、每日勿扰，跳过后不积压补发 |
+| 切换提醒场景 | “需要我时”“离开电脑”“专注片刻”；预设只组合开关，不自动检测离开 |
+| 留意 Mac 电量 | 未接电源时的 20% / 10% 提醒，监听系统电源事件 |
+| 知道长任务结束 | 显式包装的终端任务，以及 Mac 快捷指令末尾调用模板 |
+| 排查发送问题 | 按来源和结果筛选记录，查看各设备网关结果及脱敏错误类别 |
 
-提醒示例为“示例聊天 · 等待授权”“示例聊天 · 等待回答”“示例聊天 · 本轮已完成”。支持的问题会带短摘要与选项；手机只负责显示，实际回答和授权仍在 Mac 完成。内容预览可在 App 中关闭。
+原生菜单栏支持右键铃铛暂停／恢复，设置面板可从菜单重新打开。**添加一个 .app 只是登记来源**，还需该应用提供 Hook、脚本或明确的调用入口，不会自动转发全部 macOS 通知。
 
-```mermaid
-flowchart LR
-    A[Mac 上的应用事件] --> B[Bark Bridge 菜单栏工具]
-    B --> C[Bark HTTPS 推送服务]
-    C --> D[iPhone Bark 通知]
-```
+## 可以接入哪些来源
 
-这是原生 macOS 菜单栏与设置面板工具。添加其他 .app 仅代表登记来源，应用仍须提供 Hook、脚本或明确的调用入口，不会自动转发全部 macOS 通知。
+| 来源 | 接入方式与验证范围 |
+| --- | --- |
+| **Codex** | 本机 Hook 及共享 Skill；授权、支持的提问工具和主线程本轮结束已验证。普通文字提问依赖 Skill，可能遗漏 |
+| **Mac 电池** | 系统电源事件；读数和阈值规则已验证，尚未做真实放电至低电量的测试 |
+| **终端任务** | `bark-run` 包装明确指定的命令，保留输出与退出码；已验证事件链路 |
+| **Mac 快捷指令** | 在末尾加入模板命令；调用链路已验证，需自行配置工作流，前面的动作失败可能导致末尾动作不执行 |
+| **Claude Code · 实验性** | PermissionRequest、AskUserQuestion、Stop；仅完成配置合并与隔离测试，尚未验证真实会话 |
+| **其他应用** | 使用自定义调用入口；能否自动触发取决于应用是否提供事件能力 |
 
-## 获取源码
+“本轮完成”表示主线程一轮回复结束，不表示所有后台工作或整个聊天已完成。
+
+## 快速开始
+
+**准备：** iPhone 安装 [Bark](https://github.com/Finb/Bark) 并允许通知；Mac 需要 Xcode 或 Command Line Tools、`/usr/bin/python3` 和 `curl`。测试还使用系统 OpenSSL，Python 无 pip 依赖。
+
+### 1. 获取源码并构建
 
 ```sh
 git clone https://github.com/dneo9527-ctrl/bark-bridge-macos.git
 cd bark-bridge-macos
-```
-
-也可以在仓库页面使用 **Code → Download ZIP**，解压后在该目录中运行下文命令。
-
-## 环境与构建
-
-仅在 Apple Silicon Mac、macOS 26 上实测。构建目标为 macOS 13+；旧系统及 Intel Mac 尚未实机验证。
-
-需要 Xcode 或 Xcode Command Line Tools，以及 `/usr/bin/python3`、`curl`；测试还使用系统 OpenSSL。Python 仅使用标准库，无 pip 依赖。
-
-```sh
 /usr/bin/python3 scripts/test.py
 /usr/bin/python3 scripts/build.py
 ```
 
-只生成当前架构的 `build/Bark.app`。不会安装或启动 App。签名为 ad-hoc，本候选未使用 Developer ID 签名或 Apple 公证。尚未提供可承诺直接下载安装的二进制发行包；请优先从源码在自己的 Mac 构建。
+也可以从 [Releases](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1) 下载源码 ZIP，解压后进入目录。构建只生成 `build/Bark.app`，不会安装或启动。
 
-每次提交会运行 [GitHub Actions 测试与构建](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)，实际结果以对应提交的检查记录为准。
+### 2. 预览并明确安装
 
-## 首次安装
-
-先在 iPhone 安装 Bark 并允许通知。随后在 Mac 构建并预览安装计划：
+先确认 Codex CLI 能从 PATH 或常见 App 路径找到；如果不是，先看[自定义 CLI 路径](docs/INSTALL.md#首次安装)。
 
 ```sh
 /usr/bin/python3 scripts/install.py
-```
-
-安装前请确认 Codex CLI 已安装，且能通过 PATH 或常见 App 路径找到。若安装在其他位置，请在这次安装命令前设置 `CODEX_CLI_BIN="/absolute/path/to/codex"`（下方也提供单独接入命令）。
-
-明确安装并接入一个 Codex 配置目录：
-
-```sh
 /usr/bin/python3 scripts/install.py --apply --codex-home "$HOME/.codex"
 open /Applications/Bark.app
 ```
 
-安装器只支持首次安装；发现已有 Bark App 或共用运行目录会停止，防止覆盖其他安装。构建或测试不会调用安装器，也不触碰现有手机配置。未提供自动更新功能。
+首次安装器会拒绝覆盖已有 App 或共用运行目录，不用于自动升级。遇到失败或已有安装，请按[安装与恢复说明](docs/INSTALL.md)处理。
 
-如果首次安装中途失败，安装器可能已移除 App，但会保留共用运行目录和失败备份；不要反复运行 `--apply`。修正 CLI 路径或其他错误后，先把失败的共用目录移到另一安全位置保留备份，确认 `/Applications/Bark.app` 不存在，再重新首次安装。该步骤只适用于已失败且未投入使用的安装，不要移动仍在使用的运行目录。
+### 3. 添加手机，确认收到测试
 
-打开面板管理接收设备；也可点击屏幕右上角菜单栏铃铛 → “设置…”。在隐藏输入框中填写这台手机 Bark 首页的 HTTPS 推送地址，保存后发送测试并在手机确认收到。地址仅保存在本机受限权限文件中，不需要发到聊天、填入 Hook 或提交 GitHub。手机配置只填一次。
+打开面板管理接收设备，或从右上角菜单栏铃铛进入“设置…”。将 iPhone Bark 首页的 HTTPS 推送地址填入隐藏输入框，保存并发送测试，在手机上确认收到。
 
-Codex CLI 从 PATH 或常见 App 路径发现。若安装在其他位置，显式设置可执行文件路径后再运行接入：
+**手机地址只在自己的 Mac 填写。** 不需要放进聊天、Hook 或 GitHub；源代码和发布附件不包含发布者的设备密钥。
 
-```sh
-CODEX_CLI_BIN="/absolute/path/to/codex" /usr/bin/python3 "$HOME/Library/Application Support/CodexBark/manage.py" attach "$HOME/.codex"
-```
+[完整安装与卸载指南 →](docs/INSTALL.md) · [多账号接入 →](docs/INSTALL.md#多账号与多个配置目录) · [终端／快捷指令模板 →](docs/INSTALL.md#接入终端快捷指令与-claude-code)
 
-已验证的 Codex 版本为 0.167.0-alpha.3.2；Hook 及信任接口可能随 Codex 更新变化。接入前备份原配置，合并四条提醒 Hook，精确信任本工具的 Hook 定义；不改变 Codex 操作授权策略，不批准操作。旧聊天可能需要重新载入 Skill。
+## 隐私与资源
 
-CC Switch 共用配置合并默认关闭。确需跨其账号配置轮换时，向 `attach` 或安装器额外传入 `--with-cc-switch`；这会显式修改其本机 common TOML 配置，并先保存备份，不读取账号凭据。
+设备地址位于 `~/Library/Application Support/CodexBark`，目录权限为 `0700`，手机配置为 `0600`。不读取账号令牌，也不打开聊天正文文件来获取名称；聊天名来自本地只读名称元数据。
 
-## 多账号与多个配置目录
+预览开启时，所选 Bark 服务会收到聊天名、有限长度的问题／选项或固定文案。权限提醒不发送具体授权命令，完成提醒不发送回复正文；常见密钥形式会脱敏，但不能保证识别所有敏感内容。不希望外发摘要时，可关闭“手机内容预览”。详见[隐私说明](docs/PRIVACY.md)。
 
-同一 macOS 用户、同一已接入 CODEX_HOME 换号，继续引用共用发送器和设备配置。独立目录需分别接入一次：
+菜单与电池服务常驻，设置面板关闭后退出。发送器按事件短暂运行，失败不阻塞 Codex，无网络轮询或长期自动重试。不宣称零内存或零耗电。
 
-```sh
-/usr/bin/python3 "$HOME/Library/Application Support/CodexBark/manage.py" attach "/absolute/path/to/other-codex-home"
-```
+## 使用前了解
 
-不要在其他账号、电脑或云端会话上假定本机 Hook 自动存在。新平台、新版本和其他账号管理器未经验证。
+- **平台：** 界面仅在 macOS 26、Apple Silicon 实机验证；构建目标为 macOS 13+，旧系统和 Intel 界面尚未实测。
+- **Codex 兼容：** 已验证版本为 `0.167.0-alpha.3.2`，Hook 与信任接口可能随更新变化；云端会话不自动继承本机接入。
+- **送达：** 网关接受不等于手机实收。Mac 睡眠、关机、离线、APNs 或 iPhone 专注设置都可能影响提醒。
+- **分发：** 本地构建采用 ad-hoc 签名，未做 Developer ID 公证；现有源码预览不含通用预编译 App。
 
-## 接入终端、快捷指令与 Claude Code
+本项目的[验证范围](docs/VERIFICATION.md)与[对应提交的 CI 结果](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)分别记录，不将隔离测试当作全部场景实测。
 
-在“来源 → 内置模板”中选择。终端示例：
+## 反馈与贡献
 
-```sh
-"$HOME/Library/Application Support/CodexBark/bark-run" /usr/bin/true
-```
+遇到问题，可在 [Issues](https://github.com/dneo9527-ctrl/bark-bridge-macos/issues) 描述 Mac／Codex 版本、触发场景及脱敏错误类别。提交截图前请隐藏聊天内容、设备地址和密钥。欢迎通过 Pull Request 改进兼容性、文档与测试。
 
-用自己的程序和参数替换 `/usr/bin/true`。保留 stdout、stderr 和退出码；只发送成功/失败，不发送命令与输出。
-
-Mac 快捷指令的末尾“运行 Shell 脚本”动作：
-
-```sh
-/usr/bin/python3 "$HOME/Library/Application Support/CodexBark/bark.py" template-notify --template shortcuts
-```
-
-只有工作流执行到该动作才推送。这条路径适用于 Mac，不能放到 iPhone 上直接执行。没有自动创建或执行快捷指令。
-
-Claude Code 模板先检查本机 CLI。缺少 CLI 时不会代装或生成设置；接入时合并本工具入口，保留其他 Hook、permissions 和 env，不复制账号配置。移除来源会先清理自己的入口；失败时保留来源并提示。
-
-## 隐私、资源与边界
-
-参见 [隐私说明](docs/PRIVACY.md) 和 [验证范围](docs/VERIFICATION.md)。
-
-- 共用数据位于 `~/Library/Application Support/CodexBark`；目录 0700、手机配置 0600。
-- 不读取账号令牌或聊天正文；名称来自本地名称元数据。支持事件只发送聊天名、短问题/选项及固定文案，可在 App 关闭内容预览。
-- 2.4.1 修复了 Hook 会话 ID 与聊天 ID 不同时的名称回退，并补充有界名称索引读取。无法确定名称时仍保留短编号，避免串用其他聊天名称。
-- 失败不阻塞 Codex，不自动批准，无新网络轮询或长期重试。菜单/电池服务常驻，设置面板关闭后退出。
-- 服务器接受推送不等于 iPhone 实收；Mac 睡眠、关机、离线、APNs 或手机专注设置都可能影响送达。锁屏与系统睡眠是不同状态。
-- 手机用于查看提醒，回答和审批仍回到 Mac。
-
-## 卸载
-
-在 App 的“设置 → 高级 → 卸载”执行，或：
-
-```sh
-/usr/bin/python3 "$HOME/Library/Application Support/CodexBark/manage.py" uninstall
-```
-
-会删除本工具入口、手机配置与通知状态，保留其他 Codex/Claude 设置和备份。Claude 入口清理失败会停止整体卸载，避免留下失效 Hook；可检查本地 Claude 设置后重试。卸载后重启 Codex。共用代码和备份目录保留供检查，不要把整份旧配置覆盖回去。若已成功卸载并希望重新安装，先将保留的共用目录移到另一安全位置保存备份，再使用首次安装器；不要直接删除仍在使用的运行目录。
-
-## 许可
-
-本项目采用 [MIT 许可证](LICENSE)，允许使用、修改、再分发及商用，须保留版权与许可声明。图标由本项目的 AI 设计流程生成并适配，不来自 Bark 官方素材。
+本项目采用 [MIT 许可证](LICENSE)。独立社区工具，与 Bark、OpenAI、Anthropic 无官方关联。图标由本项目的 AI 设计流程生成并适配，不使用 Bark 官方图标。插图为功能示意，非实机截图。
