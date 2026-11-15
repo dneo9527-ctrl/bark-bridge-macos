@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bark Bridge for Mac — 电脑继续忙，需要你时手机提醒</title>
+<meta name="description" content="把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。原生 macOS 菜单栏工具，MIT 开源。">
+<style>
+:root{--ink:#1a1a2e;--muted:#5b5b6b;--line:#e6e6ee;--bg:#fafafc;--card:#fff;--accent:#2563eb;--accent-soft:#eef4ff;--warn-bg:#fff8e6;--warn-line:#f0d48a}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.7}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:880px;margin:0 auto;padding:0 20px 64px}
+header{padding:56px 0 8px;text-align:center}
+header img.icon{width:96px;height:96px;border-radius:22px;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+header h1{font-size:32px;margin:16px 0 4px;line-height:1.3}
+header .tag{font-size:18px;font-weight:600;margin:0}
+header .sub{color:var(--muted);margin:8px auto 0;max-width:640px}
+.badges{margin:16px 0 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.badges img{height:20px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:24px 0 8px}
+.btn{display:inline-block;padding:11px 22px;border-radius:10px;font-weight:600;font-size:16px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.btn:hover{text-decoration:none;border-color:#c9c9d8}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#1d4ed8}
+.note{font-size:13px;color:var(--muted);text-align:center}
+.warn{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:12px;padding:14px 18px;font-size:14px;margin:28px 0}
+.warn strong{display:block;margin-bottom:2px}
+.hero-img{margin:28px 0;text-align:center}
+.hero-img img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+.hero-img figcaption{font-size:13px;color:var(--muted);margin-top:8px}
+h2{font-size:22px;margin:40px 0 12px;padding-top:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.card h3{margin:0 0 6px;font-size:16px}
+.card p{margin:0;font-size:14px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card)}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:#f4f4f8}
+ol.steps{padding-left:20px}
+ol.steps li{margin-bottom:14px}
+ol.steps code,code.inline{background:#f1f1f5;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+pre{background:#16161f;color:#e8e8f0;border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:13.5px;line-height:1.6}
+pre code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+ul.tight li{margin-bottom:6px;font-size:15px}
+.doclinks{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.doclinks a{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 14px;font-size:14px;color:var(--ink)}
+.doclinks a:hover{border-color:#c9c9d8;text-decoration:none}
+footer{margin-top:56px;padding-top:24px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+footer p{margin:6px 0}
+@media(max-width:600px){header h1{font-size:26px}header .tag{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <img class="icon" src="media/app-icon.png" alt="Bark Bridge 陶瓷铃铛图标" width="96" height="96">
+  <h1>Bark Bridge for Mac</h1>
+  <p class="tag">电脑继续忙，需要你时手机提醒。</p>
+  <p class="sub">把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。同一 Mac 用户共用设备配置，现有接入目录换号继续用。</p>
+  <p class="badges">
+    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml"><img src="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml/badge.svg" alt="macOS 测试与构建状态"></a>
+    <img src="media/version.svg" alt="2.6.0 更新预览版">
+    <img src="media/license.svg" alt="MIT 许可证">
+  </p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0-preview.1/Bark-Bridge-2.6.0-macOS-arm64-preview.zip">下载安装预览 · v2.6.0</a>
+    <a class="btn" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0-preview.1">Release 说明</a>
+    <a class="btn" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.5.0-preview.1/Bark-Bridge-30s-demo.mp4">30 秒演示</a>
+  </div>
+  <p class="note">Apple Silicon · 约 32 MB · 内含图形安装助手与 Python，无需源码编译<br>
+  SHA256：<code class="inline">49aec3e590de9db3d4284f49b1c15695217d9a8e5e62fe2a0c98d06eaf9e25f9</code></p>
+</header>
+
+<div class="warn">
+  <strong>2.6.0 软件更新预览</strong>
+  尚未使用 Developer ID 签名或 Apple 公证，首次打开可能被 macOS 拦截；仅供愿意核对来源的用户试用。插图和视频均为功能示意。
+</div>
+
+<figure class="hero-img">
+  <img src="media/overview.svg" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。" width="1320">
+  <figcaption>手机负责显示提醒，实际回答和审批仍在 Mac 上完成。Bark Bridge 不改变操作授权策略，也不自动批准请求。</figcaption>
+</figure>
+
+<h2>离开电脑，也知道下一步</h2>
+<div class="grid">
+  <div class="card"><h3>需要你时提醒</h3><p>授权、提问／选择、本轮完成三类提醒分别控制，支持带聊天名及短问题预览。</p></div>
+  <div class="card"><h3>配置一次，换号继续用</h3><p>同一 macOS 用户共用手机地址，Mac 换 Codex 账号时，iPhone Bark 无需改配置。</p></div>
+  <div class="card"><h3>由你决定发给谁、何时安静</h3><p>记忆多台手机，按来源分配设备；也能暂停、临时静音或设置每日勿扰。</p></div>
+  <div class="card"><h3>留意 Mac 电量</h3><p>未接电源时的 20% / 10% 提醒，监听系统电源事件。</p></div>
+  <div class="card"><h3>知道长任务结束</h3><p>显式包装的终端任务，以及 Mac 快捷指令末尾调用模板。</p></div>
+  <div class="card"><h3>保持版本更新</h3><p>设置中检查版本，选择自动下载，校验后手动重启安装；2.6.0 起支持签名程序更新包。</p></div>
+</div>
+
+<h2>可以接入哪些来源</h2>
+<table>
+  <tr><th>来源</th><th>接入方式与验证范围</th></tr>
+  <tr><td><strong>Codex</strong></td><td>本机 Hook 及共享 Skill；授权、支持的提问工具和主线程本轮结束已验证。普通文字提问依赖 Skill，可能遗漏。</td></tr>
+  <tr><td><strong>Mac 电池</strong></td><td>系统电源事件；读数和阈值规则已验证，尚未做真实放电至低电量的测试。</td></tr>
+  <tr><td><strong>终端任务</strong></td><td><code class="inline">bark-run</code> 包装明确指定的命令，保留输出与退出码；已验证事件链路。</td></tr>
+  <tr><td><strong>Mac 快捷指令</strong></td><td>在末尾加入模板命令；调用链路已验证，需自行配置工作流。</td></tr>
+  <tr><td><strong>Claude Code · 实验性</strong></td><td>PermissionRequest、AskUserQuestion、Stop；仅完成配置合并与隔离测试，尚未验证真实会话。</td></tr>
+  <tr><td><strong>其他应用</strong></td><td>使用自定义调用入口；能否自动触发取决于应用是否提供事件能力。</td></tr>
+</table>
+<p style="font-size:14px;color:var(--muted)">“本轮完成”表示主线程一轮回复结束，不表示所有后台工作或整个聊天已完成。添加一个 .app 只是登记来源，还需该应用提供 Hook 脚本或明确的调用入口，不会自动转发全部 macOS 通知。</p>
+
+<h2>快速开始</h2>
+<ol class="steps">
+  <li><strong>下载安装预览 ZIP</strong>，解压后先阅读 <code class="inline">Start Here.html</code>，再打开 <code class="inline">Install Bark Bridge.app</code>。查看安装位置、选择是否接入默认 Codex 目录，点击“安装并打开”。</li>
+  <li><strong>已有安装请继续使用原 App。</strong>该助手只支持首次安装，检测到已有 App 或共用运行目录时会停止。已有 2.6.0+ 客户端可使用设置中的签名更新。</li>
+  <li><strong>添加手机，确认收到测试。</strong>iPhone 安装 Bark 并允许通知；打开面板管理接收设备，将 iPhone Bark 首页的 HTTPS 推送地址填入，保存并发送测试，在手机上确认收到。<strong>手机地址只在自己的 Mac 填写</strong>，不需要放进聊天、Hook 或 GitHub。</li>
+</ol>
+<p>从源码构建的替代方式、自定义 CLI 路径、多账号接入、终端／快捷指令模板，见完整安装指南：</p>
+<div class="doclinks">
+  <a href="INSTALL.html">完整安装与卸载指南 →</a>
+  <a href="UPDATES.html">更新说明 →</a>
+  <a href="PRIVACY.html">隐私说明 →</a>
+  <a href="VERIFICATION.html">验证范围 →</a>
+</div>
+
+<h2>使用前了解</h2>
+<ul class="tight">
+  <li><strong>平台：</strong>界面仅在 macOS 26、Apple Silicon 实机验证；构建目标为 macOS 13+，旧系统和 Intel 界面尚未实测。</li>
+  <li><strong>Codex 兼容：</strong>已验证版本为 <code class="inline">0.167.0-alpha.3.2</code>，Hook 与信任接口可能随更新变化；云端会话不自动继承本机接入。</li>
+  <li><strong>送达：</strong>网关接受不等于手机实收。Mac 睡眠、关机、离线、APNs 或 iPhone 专注设置都可能影响提醒。</li>
+  <li><strong>分发：</strong>安装预览仅提供 Apple Silicon，采用 ad-hoc 签名，未使用 Developer ID 签名或 Apple 公证；全新 Mac 的下载隔离提示与首次打开流程尚未实机验收。</li>
+</ul>
+
+<h2>隐私与资源</h2>
+<p>设备地址位于 <code class="inline">~/Library/Application Support/CodexBark</code>，目录权限为 <code class="inline">0700</code>，手机配置为 <code class="inline">0600</code>。不读取账号令牌，也不打开聊天正文文件来获取名称；聊天名来自本地只读名称元数据。预览开启时，所选 Bark 服务会收到聊天名、有限长度的问题／选项或固定文案。权限提醒不发送具体授权命令，完成提醒不发送回复正文；常见密钥形式会脱敏，但不能保证识别所有敏感内容。不希望外发摘要时，可关闭“手机内容预览”。菜单与电池服务常驻，设置面板关闭后退出。发送器按事件短暂运行，失败不阻塞 Codex，无网络轮询或长期自动重试。不宣称零内存或零耗电。</p>
+
+<h2>反馈与贡献</h2>
+<p>遇到问题，可在 <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/issues">Issues</a> 描述 Mac／Codex 版本、触发场景及脱敏错误类别。提交截图前请隐藏聊天内容、设备地址和密钥。欢迎通过 Pull Request 改进兼容性、文档与测试。</p>
+
+<footer>
+  <p>本项目自己的代码采用 <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/blob/main/LICENSE">MIT 许可证</a>。安装预览内嵌 Python 及依赖，来源固定于运行时清单，各自许可见第三方许可。独立社区工具，与 Bark、OpenAI、Anthropic 无官方关联。图标由本项目的 AI 设计流程生成并适配，不使用 Bark 官方图标。插图与视频为功能示意，非实机录屏或送达证据。</p>
+  <p><a href="https://github.com/dneo9527-ctrl/bark-bridge-macos">GitHub 仓库</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases">全部 Release</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml">CI 状态</a></p>
+</footer>
+
+</div>
+</body>
+</html>
