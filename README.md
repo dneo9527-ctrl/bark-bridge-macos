@@ -1,19 +1,19 @@
 <div align="center">
-  <img src="docs/media/app-icon.png" width="96" height="96" alt="Bark Bridge 陶瓷铃铛图标">
+  <img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/app-icon.png" width="96" height="96" alt="Bark Bridge 陶瓷铃铛图标">
   <h1>Bark Bridge for Mac</h1>
   <p><strong>电脑继续忙，需要你时手机提醒。</strong></p>
   <p>把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。<br>同一 Mac 用户共用设备配置，现有接入目录换号继续用。</p>
   <p>
     <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml"><img src="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml/badge.svg" alt="macOS 测试与构建状态"></a>
-    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1"><img src="https://img.shields.io/badge/2.4.1-source_preview-2563eb?style=flat-square" alt="2.4.1 源码预览版"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0f766e?style=flat-square" alt="MIT 许可证"></a>
+    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/version.svg" alt="2.4.1 源码预览版"></a>
+    <a href="LICENSE"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/license.svg" alt="MIT 许可证"></a>
   </p>
   <p><a href="#快速开始">快速开始</a> · <a href="docs/INSTALL.md">安装与接入</a> · <a href="docs/PRIVACY.md">隐私说明</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.4.1">下载源码</a></p>
 </div>
 
 <picture>
-  <source media="(max-width: 600px)" srcset="docs/media/overview-mobile.svg">
-  <img src="docs/media/overview.svg" width="1320" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。">
+  <source media="(max-width: 600px)" srcset="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/overview-mobile.svg">
+  <img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/overview.svg" width="1320" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。">
 </picture>
 
 > **当前为源码预发布。** 需要在 Mac 本地构建；尚未提供经过 Developer ID 公证的预编译安装包。以下介绍的是现有功能，插图为示意。
