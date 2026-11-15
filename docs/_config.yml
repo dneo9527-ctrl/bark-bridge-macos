@@ -1,0 +1,5 @@
+# GitHub Pages (source: /docs on main). index.html is the standalone homepage;
+# the .md docs below render as plain Jekyll pages. No theme plugins needed.
+title: Bark Bridge for Mac
+description: 把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。
+lang: zh-CN
