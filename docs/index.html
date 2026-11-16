@@ -66,17 +66,17 @@ footer p{margin:6px 0}
     <img src="media/license.svg" alt="MIT 许可证">
   </p>
   <div class="cta">
-    <a class="btn primary" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0-preview.1/Bark-Bridge-2.6.0-macOS-arm64-preview.zip">下载安装预览 · v2.6.0</a>
+    <a class="btn primary" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0-preview.1/Bark-Bridge-2.6.0-macOS-arm64-preview.zip">下载 Mac App 安装包 · v2.6.0</a>
     <a class="btn" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0-preview.1">Release 说明</a>
-    <a class="btn" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.5.0-preview.1/Bark-Bridge-30s-demo.mp4">30 秒演示</a>
+    <a class="btn" href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.5.0-preview.1/Bark-Bridge-30s-demo.mp4">30 秒演示（v2.5 核心流程示意）</a>
   </div>
-  <p class="note">Apple Silicon · 约 32 MB · 内含图形安装助手与 Python，无需源码编译<br>
+  <p class="note">Apple Silicon（M 系列）· 32,031,268 字节，约 32 MB<br>已封装原生 .app：菜单栏铃铛与独立设置窗口。内置 Python 3.13.18，无需终端、Xcode 或源码编译<br>
   SHA256：<code class="inline">49aec3e590de9db3d4284f49b1c15695217d9a8e5e62fe2a0c98d06eaf9e25f9</code></p>
 </header>
 
 <div class="warn">
   <strong>2.6.0 软件更新预览</strong>
-  尚未使用 Developer ID 签名或 Apple 公证，首次打开可能被 macOS 拦截；仅供愿意核对来源的用户试用。插图和视频均为功能示意。
+  这是 GitHub 预览分发，未上架 App Store。当前采用 ad-hoc 签名，尚未使用 Developer ID 签名或 Apple 公证，首次打开可能被 macOS 拦截。请核对来源并参考 <a href="https://support.apple.com/102445">Apple 安全打开说明</a>，不移除隔离标记、不关闭 Gatekeeper；Ed25519 更新签名不等于 Apple 公证。插图和视频均为功能示意。
 </div>
 
 <figure class="hero-img">
@@ -108,10 +108,16 @@ footer p{margin:6px 0}
 
 <h2>快速开始</h2>
 <ol class="steps">
-  <li><strong>下载安装预览 ZIP</strong>，解压后先阅读 <code class="inline">Start Here.html</code>，再打开 <code class="inline">Install Bark Bridge.app</code>。查看安装位置、选择是否接入默认 Codex 目录，点击“安装并打开”。</li>
-  <li><strong>已有安装请继续使用原 App。</strong>该助手只支持首次安装，检测到已有 App 或共用运行目录时会停止。已有 2.6.0+ 客户端可使用设置中的签名更新。</li>
+  <li><strong>下载上方首次安装 ZIP</strong>，完整解压后双击 <code class="inline">Install Bark Bridge.app</code>，再点“安装并打开”，助手会安装 <code class="inline">/Applications/Bark.app</code>。<code class="inline">Start Here.html</code> 内附操作说明。</li>
+  <li><strong>已有安装请继续使用原 App。</strong>该助手遇到已有 App 或运行目录会停止。2.4.x/2.5.x 没有新更新入口，须按可信维护指导保留数据启用 2.6，不删除数据强行重装；2.6 起可检查更新或选择自动下载，默认关闭、每 12 小时按需检查，安装仍需点“重启并更新”。保留设备、Hook/Skill 入口和授权策略。</li>
   <li><strong>添加手机，确认收到测试。</strong>iPhone 安装 Bark 并允许通知；打开面板管理接收设备，将 iPhone Bark 首页的 HTTPS 推送地址填入，保存并发送测试，在手机上确认收到。<strong>手机地址只在自己的 Mac 填写</strong>，不需要放进聊天、Hook 或 GitHub。</li>
 </ol>
+<table aria-label="下载附件用途">
+  <tr><th>附件</th><th>适用用途</th></tr>
+  <tr><td><strong>首次安装 · 新用户推荐</strong><br>macOS-arm64-preview.zip</td><td>已封装 App、图形安装助手和内置运行时，普通用户无需编译。</td></tr>
+  <tr><td>程序更新<br>macOS-arm64-update.zip</td><td>供 2.6+ 客户端核验同一 Release 的 JSON 清单与 Ed25519 签名后安装，不要手动覆盖程序目录。</td></tr>
+  <tr><td>源码<br>source.zip</td><td>开发、审查和自行构建，不是首次安装包。</td></tr>
+</table>
 <p>从源码构建的替代方式、自定义 CLI 路径、多账号接入、终端／快捷指令模板，见完整安装指南：</p>
 <div class="doclinks">
   <a href="INSTALL.html">完整安装与卸载指南 →</a>
@@ -124,12 +130,12 @@ footer p{margin:6px 0}
 <ul class="tight">
   <li><strong>平台：</strong>界面仅在 macOS 26、Apple Silicon 实机验证；构建目标为 macOS 13+，旧系统和 Intel 界面尚未实测。</li>
   <li><strong>Codex 兼容：</strong>已验证版本为 <code class="inline">0.167.0-alpha.3.2</code>，Hook 与信任接口可能随更新变化；云端会话不自动继承本机接入。</li>
-  <li><strong>送达：</strong>网关接受不等于手机实收。Mac 睡眠、关机、离线、APNs 或 iPhone 专注设置都可能影响提醒。</li>
+  <li><strong>送达：</strong>网关接受不等于手机实收。手机 Wi-Fi/移动网络、APNs、推送服务与专注设置都会影响送达，离线不保证实时收到；Mac 睡眠、关机或离线也会影响发送。</li>
   <li><strong>分发：</strong>安装预览仅提供 Apple Silicon，采用 ad-hoc 签名，未使用 Developer ID 签名或 Apple 公证；全新 Mac 的下载隔离提示与首次打开流程尚未实机验收。</li>
 </ul>
 
 <h2>隐私与资源</h2>
-<p>设备地址位于 <code class="inline">~/Library/Application Support/CodexBark</code>，目录权限为 <code class="inline">0700</code>，手机配置为 <code class="inline">0600</code>。不读取账号令牌，也不打开聊天正文文件来获取名称；聊天名来自本地只读名称元数据。预览开启时，所选 Bark 服务会收到聊天名、有限长度的问题／选项或固定文案。权限提醒不发送具体授权命令，完成提醒不发送回复正文；常见密钥形式会脱敏，但不能保证识别所有敏感内容。不希望外发摘要时，可关闭“手机内容预览”。菜单与电池服务常驻，设置面板关闭后退出。发送器按事件短暂运行，失败不阻塞 Codex，无网络轮询或长期自动重试。不宣称零内存或零耗电。</p>
+<p>设备地址位于 <code class="inline">~/Library/Application Support/CodexBark</code>，目录权限为 <code class="inline">0700</code>，手机配置为 <code class="inline">0600</code>。不读取账号令牌，也不打开聊天正文文件来获取名称；聊天名来自本地只读名称元数据。预览开启时，所选 Bark 服务会收到聊天名、有限长度的问题／选项或固定文案。权限提醒不发送具体授权命令，完成提醒不发送回复正文；常见密钥形式会脱敏，但不能保证识别所有敏感内容。不希望外发摘要时，可关闭“手机内容预览”。菜单与电池服务常驻，设置面板关闭后退出。发送器按事件短暂运行，失败不阻塞 Codex，不长期重试；可选软件更新另按时间门限检查。不宣称零内存或零耗电。</p>
 
 <h2>反馈与贡献</h2>
 <p>遇到问题，可在 <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/issues">Issues</a> 描述 Mac／Codex 版本、触发场景及脱敏错误类别。提交截图前请隐藏聊天内容、设备地址和密钥。欢迎通过 Pull Request 改进兼容性、文档与测试。</p>

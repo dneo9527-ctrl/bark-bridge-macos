@@ -2,15 +2,23 @@
 
 [← 返回项目首页](../README.md)
 
-当前为 **2.6.0 开发者预览**。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
+当前为 **2.6.0 开发者预览**，已封装为原生 macOS `.app`，有菜单栏铃铛与独立设置窗口。这是 GitHub 下载分发，未上架 App Store。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
 
 ## 下载图形安装预览
 
-1. 下载 [Release 中的 Apple Silicon ZIP](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0-preview.1)，解压后先阅读 `Start Here.html`。
+1. **下载 [Bark-Bridge-2.6.0-macOS-arm64-preview.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0-preview.1/Bark-Bridge-2.6.0-macOS-arm64-preview.zip)**（32,031,268 字节，约 32 MB），完整解压后先阅读 `Start Here.html`。
 2. 打开 `Install Bark Bridge.app`，查看安装位置与 Codex 接入选项，再点击“安装并打开”。此包内置 Python，无需自行安装 Xcode、Python 或 pip。
 3. 安装完成后添加接收设备，在 iPhone 上确认收到测试。未找到 Codex CLI 时可先安装 App，稍后按下文接入。
 
-**未公证预览：** 此包采用 ad-hoc 签名，尚未使用 Developer ID 签名或 Apple 公证。macOS 可能拦截首次打开；请先核对本项目的下载来源和 `SHA256SUMS`，再阅读 [Apple 安全打开说明](https://support.apple.com/102445) 并自行决定是否信任。无需关闭 Gatekeeper、移除整个系统的安全保护或禁用检疫。
+| 附件 | 使用者与用途 |
+| --- | --- |
+| `Bark-Bridge-2.6.0-macOS-arm64-preview.zip` | 新用户首次安装；含已封装的 App、图形助手及 Python 3.13.18，不需要终端、Xcode 或编译 |
+| `Bark-Bridge-2.6.0-preview.1-macOS-arm64-update.zip` | 已启用 2.6+ 更新客户端的用户；由客户端验证同 Release 的 JSON 清单及 Ed25519 `.sig`，不要手动覆盖程序 |
+| `Bark-Bridge-2.6.0-source.zip` | 开发者审查/自行构建；不是普通用户的首次安装包 |
+
+当前安装包只分发 Apple Silicon（M 系列）。编译最低目标 macOS 13，实际界面仅在 macOS 26 arm64 本机验证；没有宣称 Intel 或 macOS 13 实机通过。下方“获取源码”和“环境与构建”仅面向开发者，图形包用户不需要执行。
+
+**未公证预览：** 此包采用 ad-hoc 签名，尚未使用 Developer ID 签名或 Apple 公证。macOS 可能拦截首次打开；请先核对本项目的下载来源和 `SHA256SUMS`，再阅读 [Apple 安全打开说明](https://support.apple.com/102445) 并自行决定是否信任。不移除隔离标记、不关闭 Gatekeeper。发布者的 Ed25519 更新签名不能替代 Apple 公证。
 
 安装到 `/Applications/Bark.app`，共用运行目录为 `~/Library/Application Support/CodexBark`；需要当前用户对 Applications 有写权限，不自动请求 sudo。已有 App、运行目录或指向它们的符号链接都会阻止安装。安装助手不会升级已有用户版本。
 
@@ -19,6 +27,14 @@
 ## 已有 2.4.x / 2.5.x 安装
 
 这些版本没有更新公钥入口，当前没有面向旧版的一键迁移工具。请继续使用原版，不用首次安装助手覆盖，也不手动复制未知程序文件。需要迁移指导时，可在 [Issues](https://github.com/dneo9527-ctrl/bark-bridge-macos/issues) 提供版本号、macOS 版本与架构；不要上传设备地址、配置、日志、聊天或备份。维护者核对旧安装结构后再提供针对性的备份与回退步骤。本机一次受控源码迁移成功不代表所有旧安装已验证。
+
+## 已有 2.6+ 安装的更新
+
+在“设置”检查更新或选择自动下载，后者默认关闭；开启后每 12 小时按需检查，菜单启动/系统唤醒也受时间门限约束。校验下载完成后点击“重启并更新”才安装，不会在工作途中自行重启。设备数据、既有 Hook/Skill 接入与授权策略保留；完整机制见 [软件更新](UPDATES.md)。首次安装 ZIP、程序更新 ZIP 与源码 ZIP 不互相替代。
+
+## 配置 iPhone 接收
+
+iPhone 安装 Bark 并允许通知，Mac 打开菜单栏铃铛的“设置”→接收设备，填入手机 Bark 的 HTTPS 地址、保存并发送测试。地址/密钥只在本机填写，不提交到 Issue、聊天或截图。Wi-Fi 或移动网络均依赖手机联网、APNs 与推送服务；离线不保证实时收到，发送网关接受不等于手机实收。Bark Bridge 仅响应已接入的事件，不会自动转发任意 App 的全部通知。
 
 ## 获取源码
 
