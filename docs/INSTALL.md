@@ -2,23 +2,23 @@
 
 [← 返回项目首页](../README.md)
 
-当前为 **2.6.0 开发者预览**，已封装为原生 macOS `.app`，有菜单栏铃铛与独立设置窗口。这是 GitHub 下载分发，未上架 App Store。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
+当前为 **2.6.0 正式版 · Build 47**，已封装为原生 macOS `.app`，有菜单栏铃铛与独立设置窗口。这是 GitHub 下载分发，未上架 App Store。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
 
-## 下载图形安装预览
+## 下载图形安装包
 
-1. **下载 [Bark-Bridge-2.6.0-macOS-arm64-preview.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0-preview.1/Bark-Bridge-2.6.0-macOS-arm64-preview.zip)**（32,031,268 字节，约 32 MB），完整解压后先阅读 `Start Here.html`。
+1. **下载 [Bark-Bridge-2.6.0-macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0/Bark-Bridge-2.6.0-macOS-arm64.zip)**（约 32 MB；精确大小与摘要见 Release），完整解压后先阅读 `Start Here.html`。
 2. 打开 `Install Bark Bridge.app`，查看安装位置与 Codex 接入选项，再点击“安装并打开”。此包内置 Python，无需自行安装 Xcode、Python 或 pip。
 3. 安装完成后添加接收设备，在 iPhone 上确认收到测试。未找到 Codex CLI 时可先安装 App，稍后按下文接入。
 
 | 附件 | 使用者与用途 |
 | --- | --- |
-| `Bark-Bridge-2.6.0-macOS-arm64-preview.zip` | 新用户首次安装；含已封装的 App、图形助手及 Python 3.13.18，不需要终端、Xcode 或编译 |
-| `Bark-Bridge-2.6.0-preview.1-macOS-arm64-update.zip` | 已启用 2.6+ 更新客户端的用户；由客户端验证同 Release 的 JSON 清单及 Ed25519 `.sig`，不要手动覆盖程序 |
+| `Bark-Bridge-2.6.0-macOS-arm64.zip` | 新用户首次安装；含已封装的 App、图形助手及 Python 3.13.18，不需要终端、Xcode 或编译 |
+| `Bark-Bridge-2.6.0-macOS-arm64-update.zip` | 已启用 2.6+ 更新客户端的用户；由客户端验证同 Release 的 JSON 清单及 Ed25519 `.sig`，不要手动覆盖程序 |
 | `Bark-Bridge-2.6.0-source.zip` | 开发者审查/自行构建；不是普通用户的首次安装包 |
 
 当前安装包只分发 Apple Silicon（M 系列）。编译最低目标 macOS 13，实际界面仅在 macOS 26 arm64 本机验证；没有宣称 Intel 或 macOS 13 实机通过。下方“获取源码”和“环境与构建”仅面向开发者，图形包用户不需要执行。
 
-**未公证预览：** 此包采用 ad-hoc 签名，尚未使用 Developer ID 签名或 Apple 公证。macOS 可能拦截首次打开；请先核对本项目的下载来源和 `SHA256SUMS`，再阅读 [Apple 安全打开说明](https://support.apple.com/102445) 并自行决定是否信任。不移除隔离标记、不关闭 Gatekeeper。发布者的 Ed25519 更新签名不能替代 Apple 公证。
+**Apple 签名状态：** 此包采用 ad-hoc 签名，尚未使用 Developer ID 签名或 Apple 公证。macOS 可能拦截首次打开；请先核对本项目的下载来源和 `SHA256SUMS`，再阅读 [Apple 安全打开说明](https://support.apple.com/102445) 并自行决定是否信任。不移除隔离标记、不关闭 Gatekeeper。发布者的 Ed25519 更新签名不能替代 Apple 公证。
 
 安装到 `/Applications/Bark.app`，共用运行目录为 `~/Library/Application Support/CodexBark`；需要当前用户对 Applications 有写权限，不自动请求 sudo。已有 App、运行目录或指向它们的符号链接都会阻止安装。安装助手不会升级已有用户版本。
 
@@ -56,7 +56,7 @@ cd bark-bridge-macos
 /usr/bin/python3 scripts/build.py
 ```
 
-只生成当前架构的 `build/Bark.app`，不会安装或启动 App。签名为 ad-hoc，未使用 Developer ID 签名或 Apple 公证。想直接试用时可使用上方的 Apple Silicon 安装预览。
+只生成当前架构的 `build/Bark.app`，不会安装或启动 App。签名为 ad-hoc，未使用 Developer ID 签名或 Apple 公证。想直接试用时可使用上方的 Apple Silicon 安装包。
 
 每次提交会运行 [GitHub Actions 测试与构建](https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml)，实际结果以对应提交的检查记录为准。
 
@@ -89,7 +89,7 @@ Codex CLI 从 PATH 或常见 App 路径发现。若安装在其他位置，显�
 CODEX_CLI_BIN="/absolute/path/to/codex" "$HOME/Library/Application Support/CodexBark/python/bin/python3" "$HOME/Library/Application Support/CodexBark/manage.py" attach "$HOME/.codex"
 ```
 
-下文命令使用安装预览内置的 Python。若从源码安装且没有 `python/bin/python3`，用 `/usr/bin/python3` 替换命令中的解释器路径。
+下文命令使用安装包内置的 Python。若从源码安装且没有 `python/bin/python3`，用 `/usr/bin/python3` 替换命令中的解释器路径。
 
 已验证的 Codex 版本为 0.167.0-alpha.3.2；Hook 及信任接口可能随 Codex 更新变化。接入前备份原配置，合并四条提醒 Hook，精确信任本工具的 Hook 定义；不改变 Codex 操作授权策略，不批准操作。旧聊天可能需要重新载入 Skill。
 

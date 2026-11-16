@@ -7,6 +7,10 @@
 - 预览版接收稳定版和 preview 更新，稳定版只接收稳定更新。只选择具有本机架构签名清单的 Release，现有旧版首次安装 ZIP 不会被当成更新包。
 - 检查使用固定公开仓库的 GitHub API，不读取 GitHub 登录或令牌。限流、断网和校验失败会显示可重试状态，不影响推送。
 
+## 2.6.0 正式版
+
+正式版为 `v2.6.0`、Build 47、stable 通道；已安装 `v2.6.0-preview.1` 的用户可在设置中检查更新。稳定版按标签和 GitHub prerelease 标记过滤预览更新。此前预览版标签与附件保留；不要用首次安装包覆盖已有安装。
+
 ## 保留与回退
 
 更新协议 1 只替换 `/Applications/Bark.app` 和共享目录中的 `bark.py`、`manage.py`、`claude_bark.py`、`bark-run`、`updater.py`。设备、规则、来源、历史、Hook/Skill 入口、Codex 账号目录与授权策略不在更新包范围内。Python 解释器不在协议 1 更新范围内，后续需要升级解释器时应另设计兼容迁移。
@@ -19,7 +23,7 @@
 
 ## 发布者流程
 
-1. 运行测试和 `scripts/audit.py`，统一 VERSION、build、release tag，再 `python3 scripts/build.py`。
+1. 运行测试和 `scripts/audit.py`，统一 VERSION 和 assets/release.json 中的 version、build、tag、channel，再 `python3 scripts/build.py`。
 2. 首次建立独立 Ed25519 发布密钥：`xcrun swift scripts/sign-update.swift create /受限本机目录/update-signing.key assets/update-public-key.txt`。私钥只留本机，目录 0700、文件 0600；公钥进入 App。已有密钥不能重建或覆盖，应独立备份。密钥轮换需要兼容设计。
 3. `python3 scripts/package-update.py --signing-key /受限本机目录/update-signing.key --out /新的输出目录`。只从公开源码与构建输出取程序文件，生成 ZIP、`bark-update-arm64.json`、`bark-update-arm64.sig`、SHA256SUMS。打包后不再改动构建产物。
 4. 向对应 tag 的 Release 上传全部更新附件，确认签名与摘要、准确源码 SHA、CI 和重新下载验证。不得覆盖已发 tag/附件。首个包含公钥的版本需要先通过现有可信安装方式安装；更早版本没有更新入口。
@@ -27,6 +31,6 @@
 
 签名清单固定仓库、tag、版本、架构、大小与 ZIP 摘要，并列出每个文件的摘要和模式。客户端使用 App 内置 CryptoKit 验证器核验 Ed25519；拒绝降级、未知协议、路径逃逸、符号链接、重复或额外文件，再验证 App 签名与可执行健康检查。
 
-发布签名证明更新来自持有发布私钥的一方，不能替代 Apple Developer ID、Gatekeeper 或公证。当前预览仍是 ad-hoc 签名，尚未公证。不会移除隔离标记或关闭系统安全检查；macOS 拦截时参考 [Apple 安全打开说明](https://support.apple.com/102445)。
+发布签名证明更新来自持有发布私钥的一方，不能替代 Apple Developer ID、Gatekeeper 或公证。当前 GitHub 正式分发仍是 ad-hoc 签名，尚未公证。不会移除隔离标记或关闭系统安全检查；macOS 拦截时参考 [Apple 安全打开说明](https://support.apple.com/102445)。
 
 真实网络新版下载到重启、网络下载后隔离首开、Intel 和旧 macOS 的结果需分别验收，不能用隔离事务测试替代。

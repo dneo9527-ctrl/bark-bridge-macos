@@ -18,6 +18,28 @@ def module(name, path):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_release_identity_rejects_mixed_version_build_and_channel(self):
+        release = module('release_identity', ROOT/'scripts/release_metadata.py')
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); (root/'assets').mkdir(); (root/'VERSION').write_text('2.6.0\n')
+            valid={'version':'2.6.0','build':47,'tag':'v2.6.0','channel':'stable'}
+            for field,value in [('version','2.5.0'),('build',True),('tag','v2.6.0-preview.1'),('channel','other')]:
+                bad={**valid,field:value}; (root/'assets/release.json').write_text(json.dumps(bad))
+                with self.subTest(field=field),self.assertRaises(ValueError):release.read_metadata(root)
+            (root/'assets/release.json').write_text(json.dumps(valid))
+            self.assertEqual(release.read_metadata(root),valid)
+
+    def test_packaging_rejects_an_app_from_the_previous_preview_build(self):
+        import plistlib
+        release = module('release_app_identity', ROOT/'scripts/release_metadata.py')
+        metadata={'version':'2.6.0','build':47,'tag':'v2.6.0','channel':'stable'}
+        with tempfile.TemporaryDirectory() as temporary:
+            app=Path(temporary)/'Bark.app'; (app/'Contents/Resources').mkdir(parents=True)
+            info={'CFBundleIdentifier':'local.codex.bark.menu','CFBundleShortVersionString':'2.6.0','CFBundleVersion':'46'}
+            (app/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
+            (app/'Contents/Resources/release.json').write_text(json.dumps({'tag':'v2.6.0-preview.1','channel':'preview','update_protocol':1}))
+            with self.assertRaises(ValueError):release.verify_app_identity(app,metadata)
+
     def manager(self, directory):
         m = module('release_manage', ROOT/'src/runtime/manage.py')
         m.BASE = directory/'runtime'

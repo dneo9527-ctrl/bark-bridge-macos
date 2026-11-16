@@ -7,6 +7,7 @@ import plistlib
 from pathlib import Path
 import shutil
 import subprocess
+from release_metadata import read_metadata
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,7 +18,8 @@ def main():
     args = parser.parse_args()
     if platform.system() != 'Darwin':
         raise SystemExit('macOS and Xcode Command Line Tools are required.')
-    version = (ROOT / 'VERSION').read_text().strip()
+    metadata = read_metadata()
+    version = metadata['version']
     app = ROOT / 'build/Bark.app'
     panel = app / 'Contents/Helpers/Codex Bark Panel.app'
     for bundle, executable, identifier, accessory in [
@@ -29,11 +31,11 @@ def main():
         shutil.copy2(ROOT / 'assets/AppIcon.icns', bundle / 'Contents/Resources/AppIcon.icns')
         info = dict(CFBundleName='Bark', CFBundleDisplayName='Bark', CFBundlePackageType='APPL',
                     CFBundleExecutable=executable, CFBundleIdentifier=identifier, CFBundleIconFile='AppIcon',
-                    CFBundleShortVersionString=version, CFBundleVersion='46', LSMinimumSystemVersion='13.0',
+                    CFBundleShortVersionString=version, CFBundleVersion=str(metadata['build']), LSMinimumSystemVersion='13.0',
                     LSUIElement=accessory, LSMultipleInstancesProhibited=True, NSHighResolutionCapable=True)
         (bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
         (bundle / 'Contents/Resources/release.json').write_text(json.dumps({
-            'tag': 'v' + version + '-preview.1', 'channel': 'preview', 'update_protocol': 1}) + '\n')
+            'tag': metadata['tag'], 'channel': metadata['channel'], 'update_protocol': 1}) + '\n')
     shutil.copy2(ROOT / 'assets/update-public-key.txt', app / 'Contents/Resources/update-public-key.txt')
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-O', '-target', args.arch+'-apple-macos13.0',
                     str(ROOT / 'src/BarkUpdateVerifier.swift'), '-o', str(app / 'Contents/Helpers/BarkUpdateVerifier')], check=True)

@@ -1,33 +1,32 @@
 {
   "version": "2.6.0",
-  "build": 46,
-  "tag": "v2.6.0-preview.1",
-  "distribution": "Apple Silicon developer preview; first-install and signed program-update archives",
+  "build": 47,
+  "tag": "v2.6.0",
+  "channel": "stable",
+  "distribution": "GitHub stable; Apple Silicon first-install and Ed25519 program-update archives",
   "license": "MIT",
-  "python_test_executions_per_interpreter": 280,
-  "python_test_passed_per_interpreter": 279,
+  "verification_status": "local_checks_passed",
+  "signature": "ad-hoc; not Developer ID or notarized",
+  "prior_evidence": "The earlier v2.6.0-preview.1 release retains its own tests and asset verification. Those results are not relabeled as the current build.",
+  "publication": "Exact source commit, CI and final artifacts are recorded in the v2.6.0 Release.",
+  "unverified": [
+    "fresh physical Mac quarantine first-open",
+    "Developer ID and notarization",
+    "Intel and macOS13 physical device",
+    "long-term idle battery impact",
+    "new end-to-end physical iPhone delivery"
+  ],
+  "new_daemons": 0,
+  "installed_config_read": false,
+  "python_test_executions_per_interpreter": 283,
+  "python_test_passed_per_interpreter": 282,
   "python_test_skipped_per_interpreter": 1,
   "interpreters": [
-    "system Python 3.9",
-    "bundled Python 3.13.18"
+    "system Python3.9.6",
+    "bundled Python3.13.18"
   ],
-  "skip_reason": "optional real Codex integration; separately exercised using isolated first-install verification",
-  "native_build": "arm64 passed",
-  "signature": "ad-hoc verified; not Developer ID or notarized",
-  "isolated_update": {
-    "native_signature_verified": true,
-    "tampered_manifest_rejected": true,
-    "archive_sha256_verified": true,
-    "strict_payload_verified": true,
-    "signed_program_update_applied": true,
-    "private_sentinels_unchanged": true,
-    "installed_native_verifier": true,
-    "installed_deep_signature": true,
-    "transaction": "complete",
-    "baseline": "installed 2.4.1 app copy; only code copied, no user runtime data",
-    "actual_current_user_install": false,
-    "network_update": false
-  },
+  "skip_reason": "Optional real Codex test; real CLI first-install hook trust was separately checked in temporary CODEX_HOME.",
+  "native_build": "AppleSilicon passed",
   "isolated_first_install": {
     "archive_checksum": true,
     "extracted_installer_signature": true,
@@ -45,43 +44,33 @@
     "manifest_mode": "0600",
     "real_user_state_written": false
   },
-  "actual_local_upgrade": {
-    "from_version": "2.4.1",
-    "to_version": "2.6.0",
+  "isolated_update": {
+    "baseline": "Actual v2.6.0-preview.1 public App, verifier and updater, no version override",
+    "target": "v2.6.0",
+    "network": "local frozen assets",
+    "scope": "Disposable app/runtime, fake data; apply(restart=False), no real installation or GUI restart",
+    "real_user_state_written": false,
+    "tampered_manifest_rejected": true,
+    "manifest": {
+      "tag": "v2.6.0",
+      "build": 47,
+      "size": 3220061,
+      "sha256": "d2f4eccb0a8f240fcf73f46972632118fe39fb1e5de07d9e50299f9d9dbda3c4"
+    },
+    "apply": {
+      "ok": true,
+      "updated": true
+    },
+    "status": "passed",
+    "installed": {
+      "version": "2.6.0",
+      "build": "47",
+      "tag": "v2.6.0",
+      "preview": false
+    },
     "transaction": "complete",
-    "readiness_version_and_pid": true,
-    "installed_native_settings_ui": true,
-    "automatic_download": false,
-    "config_read_or_copied": false
-  },
-  "regression": "Initial real attempt rolled back after old menu executable path became unresolvable; fixed pre-swap menu shutdown plus ps comm fallback and added 2 tests.",
-  "release_assets": {
-    "Bark-Bridge-2.6.0-macOS-arm64-preview.zip": {
-      "sha256": "49aec3e590de9db3d4284f49b1c15695217d9a8e5e62fe2a0c98d06eaf9e25f9",
-      "bytes": 32031268
-    },
-    "Bark-Bridge-2.6.0-preview.1-macOS-arm64-update.zip": {
-      "sha256": "79cee73db31ecb8399ec605cf12472ec9e790089196e5fe5d50cecd047f0dece",
-      "bytes": 3220057
-    },
-    "bark-update-arm64.json": {
-      "sha256": "d259e89d7cb9dcff3ce1f35e40b5607afff0fa423c114e68611541c9d58d8568",
-      "bytes": 2642
-    },
-    "bark-update-arm64.sig": {
-      "sha256": "88cc8beeb5c998a938e877d07a90760fc0be742d0fe2413afcdfaf836f35aa2c",
-      "bytes": 89
-    }
-  },
-  "publication": "Local build evidence for 45d4034a8a833b03dc5f63eae1270fc075108936; publication and exact-SHA CI are recorded separately in the GitHub Release.",
-  "remote_ci_run": false,
-  "unverified": [
-    "real public network version-to-version download/install",
-    "fresh Mac Gatekeeper quarantine first-open",
-    "Developer ID and notarization",
-    "Intel and macOS13 physical device",
-    "long-term idle battery impact"
-  ],
-  "new_daemons": 0,
-  "installed_config_read": false
+    "private_sentinels_unchanged": true,
+    "installed_deep_codesign": true,
+    "old_public_verifier_accepted_new_signature": true
+  }
 }

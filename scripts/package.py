@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from release_metadata import read_metadata, verify_app_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 MACHO = {b'\xcf\xfa\xed\xfe', b'\xce\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca'}
@@ -40,11 +41,14 @@ def main():
     parser.add_argument('--python-archive', type=Path, required=True)
     args = parser.parse_args()
     if sys.platform != 'darwin' or os.uname().machine != 'arm64':
-        raise SystemExit('This binary preview is built and verified on Apple Silicon only.')
+        raise SystemExit('This binary distribution is built and verified on Apple Silicon only.')
+    metadata = read_metadata()
     subprocess.run([sys.executable, str(ROOT / 'scripts/audit.py')], check=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/build.py'), '--arch', 'arm64'], check=True)
-    version = (ROOT / 'VERSION').read_text().strip()
-    folder = ROOT / 'dist' / ('Bark-Bridge-' + version + '-macOS-arm64-preview')
+    verify_app_identity(ROOT / 'build/Bark.app', metadata)
+    version = metadata['version']
+    suffix = '-preview' if metadata['channel'] == 'preview' else ''
+    folder = ROOT / 'dist' / ('Bark-Bridge-' + version + '-macOS-arm64' + suffix)
     if folder.exists():
         raise SystemExit('Package folder exists; preserve or remove the previous build explicitly.')
     folder.mkdir(parents=True)
@@ -72,7 +76,7 @@ def main():
     info = dict(CFBundleName='Install Bark Bridge', CFBundleDisplayName='Install Bark Bridge',
                 CFBundleExecutable='BarkBridgeInstaller', CFBundleIdentifier='local.codex.bark.installer',
                 CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString=version,
-                CFBundleVersion='46', LSMinimumSystemVersion='13.0', NSHighResolutionCapable=True)
+                CFBundleVersion=str(metadata['build']), LSMinimumSystemVersion='13.0', NSHighResolutionCapable=True)
     (installer / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-O', '-target', 'arm64-apple-macos13.0', '-framework', 'AppKit', str(ROOT / 'src/BarkInstaller.swift'), '-o', str(binaries / 'BarkBridgeInstaller')], check=True)
     sign(installer)

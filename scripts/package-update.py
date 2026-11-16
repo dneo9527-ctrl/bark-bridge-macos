@@ -12,6 +12,7 @@ from pathlib import Path
 import plistlib
 import subprocess
 import zipfile
+from release_metadata import read_metadata, verify_app_identity
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -21,14 +22,14 @@ def main():
     parser.add_argument('--signing-key', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
+    metadata = read_metadata()
     os.umask(0o077)
     subprocess.run([os.sys.executable, str(ROOT/'scripts/audit.py')], check=True)
     spec = importlib.util.spec_from_file_location('updater', ROOT/'src/runtime/updater.py')
     updater = importlib.util.module_from_spec(spec); spec.loader.exec_module(updater)
     app = ROOT/'build/Bark.app'
     subprocess.run(['/usr/bin/codesign','--verify','--deep','--strict',str(app)], check=True)
-    release = json.loads((app/'Contents/Resources/release.json').read_bytes())
-    info = plistlib.loads((app/'Contents/Info.plist').read_bytes())
+    info, release = verify_app_identity(app, metadata)
     arch = os.uname().machine
     tag = release['tag']
     version = info['CFBundleShortVersionString']

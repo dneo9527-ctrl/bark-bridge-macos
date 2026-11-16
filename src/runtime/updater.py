@@ -296,6 +296,7 @@ class Updater:
                     if release.get('prerelease') and not current['preview']: continue
                     try: key = version_key(release.get('tag_name'))
                     except UpdateError: continue
+                    if not current['preview'] and key[3] == 0: continue
                     assets = {a.get('name') for a in release.get('assets', []) if isinstance(a, dict)}
                     if {'bark-update-' + self.arch + '.json', 'bark-update-' + self.arch + '.sig'} <= assets:
                         eligible.append((key, release['tag_name']))

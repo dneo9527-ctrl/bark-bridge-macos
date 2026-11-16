@@ -91,6 +91,13 @@ class UpdaterTests(unittest.TestCase):
         self.assertEqual(result['error'],'signature_invalid')
         self.assertFalse((self.up.root/'stage').exists())
 
+    def test_stable_ignores_preview_tag_even_if_github_flag_is_wrong(self):
+        (self.app/'Contents/Resources/release.json').write_text(json.dumps(dict(tag='v2.5.0',channel='stable')))
+        releases=[dict(tag_name=tag,prerelease=False,assets=[{'name':'bark-update-'+self.up.arch+ext} for ext in ('.json','.sig')])
+                  for tag in ['v2.6.0','v9.0.0-preview.1']]
+        with patch.object(u,'fetch',side_effect=lambda url,*args:json.dumps(releases).encode() if url==u.API else b'fixture'),patch.object(self.up,'signed_manifest',return_value={'size':123}):
+            self.assertEqual(self.up.check()['tag'],'v2.6.0')
+
     def test_manifest_rejects_other_repository_arch_duplicate_keys_and_data_paths(self):
         manifest=self.stage()
         for field,value in [('repository','someone/else'),('arch','unsupported'),('size',u.MAX_ARCHIVE+1)]:

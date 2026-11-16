@@ -75,7 +75,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         icon.heightAnchor.constraint(equalToConstant: 64).isActive = true
         let title = label("从 Mac，连接到你的手机。", size: 25, weight: .semibold)
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        let subtitle = label("Bark Bridge \(version) · Apple Silicon 安装预览", secondary: true)
+        let subtitle = label("Bark Bridge \(version) · Apple Silicon", secondary: true)
         let header = NSStackView(views: [title, subtitle]); header.orientation = .vertical; header.alignment = .leading; header.spacing = 7
         let hero = NSStackView(views: [icon, header]); hero.spacing = 18; hero.alignment = .centerY
         let divider = NSBox(); divider.boxType = .separator
@@ -85,7 +85,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         attachBox.state = cli == nil ? .off : .on; attachBox.isEnabled = cli != nil
         attachBox.font = .systemFont(ofSize: 13)
         let permission = label(cli == nil ? "未找到 Codex CLI：可先安装 App，稍后按安装指南接入。" : "接入会先备份配置，再合并本工具的 Hook 与共享 Skill。操作授权仍由你决定。", size: 12, secondary: true)
-        let previewNotice = label("未公证开发者预览版", size: 13, weight: .semibold)
+        let previewNotice = label("GitHub 分发 · 尚未经过 Apple 公证", size: 13, weight: .semibold)
         previewNotice.textColor = .systemOrange
         let notice = label("尚未使用 Developer ID 签名或 Apple 公证，首次打开可能被 macOS 拦截。请先核对下载来源与校验值，再参考 Apple 的安全打开说明。", size: 12, secondary: true)
         let security = NSButton(title: "Apple 安全打开说明 ↗", target: self, action: #selector(securityInfo)); security.bezelStyle = .inline
