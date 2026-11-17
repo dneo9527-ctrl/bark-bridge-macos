@@ -19,3 +19,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-party artwork notice (outside the MIT grant above):
+docs/media/codex-source-icon.png is an OpenAI Codex identification graphic.
+OpenAI retains its artwork and trademark rights; see docs/THIRD_PARTY_ARTWORK.md.

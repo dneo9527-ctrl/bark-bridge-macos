@@ -21,7 +21,9 @@ class NotificationIconTests(unittest.TestCase):
         for kind in ('permission', 'question', 'complete', 'source_test'):
             with self.subTest(kind=kind):
                 call = self.capture({'kind': kind, 'source_id': 'codex'})[0]
-                self.assertEqual(json.loads(call.kwargs['input'])['icon'], self.m.SOURCE_ICONS['codex'])
+                payload = json.loads(call.kwargs['input'])
+                self.assertEqual(payload['icon'], self.m.SOURCE_ICONS['codex'])
+                self.assertEqual(payload['isArchive'], '1')
 
     def test_hook_inferred_source_has_icon_without_chat_preview(self):
         self.m.set_codex_preview(False)
@@ -29,6 +31,7 @@ class NotificationIconTests(unittest.TestCase):
                                        'tool_name': 'Bash', 'tool_input': {'command': 'PRIVATE_COMMAND'}})
         payload = json.loads(self.capture(event)[0].kwargs['input'])
         self.assertEqual(payload['icon'], self.m.SOURCE_ICONS['codex'])
+        self.assertEqual(payload['isArchive'], '1')
         self.assertEqual(payload['title'], 'Codex 等待授权')
         self.assertNotIn('PRIVATE_COMMAND', json.dumps(payload))
 
@@ -43,7 +46,9 @@ class NotificationIconTests(unittest.TestCase):
                       {'kind': 'source_test', 'source_id': 'other-app'},
                       {'kind': 'battery', 'battery_percent': 20}, {'kind': 'test'}):
             with self.subTest(event=event):
-                self.assertNotIn('icon', json.loads(self.capture(event)[0].kwargs['input']))
+                payload = json.loads(self.capture(event)[0].kwargs['input'])
+                self.assertNotIn('icon', payload)
+                self.assertEqual(payload['isArchive'], '0')
 
     def test_every_routed_device_gets_icon_and_partial_failure_is_preserved(self):
         second = self.m.add_device('https://example.test/SECOND_FAKE_KEY', 'fixture')['id']
@@ -56,7 +61,9 @@ class NotificationIconTests(unittest.TestCase):
             self.assertEqual(self.m.deliver(self.event), 'partial')
         self.assertEqual(run.call_count, 2)
         for call in run.call_args_list:
-            self.assertEqual(json.loads(call.kwargs['input'])['icon'], self.m.SOURCE_ICONS['codex'])
+            payload = json.loads(call.kwargs['input'])
+            self.assertEqual(payload['icon'], self.m.SOURCE_ICONS['codex'])
+            self.assertEqual(payload['isArchive'], '1')
         row = json.loads(self.m.LOG.read_text().splitlines()[-1])
         self.assertEqual((row['delivered'], row['total']), (1, 2))
 
@@ -66,6 +73,7 @@ class NotificationIconTests(unittest.TestCase):
             self.assertEqual(self.m.send_target({'server': 'https://example.test', 'device_key': self.secret},
                                                'title', 'body', 'Codex'), (True, 200, 'accepted'))
         self.assertNotIn('icon', json.loads(run.call_args.kwargs['input']))
+        self.assertEqual(json.loads(run.call_args.kwargs['input'])['isArchive'], '0')
 
     def test_icon_adds_no_fetch_retry_or_private_arguments_and_logs(self):
         calls = self.capture(dict(self.event))
@@ -83,6 +91,7 @@ class NotificationIconTests(unittest.TestCase):
         url = urlsplit(self.m.SOURCE_ICONS['codex'])
         self.assertEqual((url.scheme, url.hostname, url.query, url.fragment),
                          ('https', 'raw.githubusercontent.com', '', ''))
+        self.assertRegex(url.path, r'^/dneo9527-ctrl/bark-bridge-macos/[0-9a-f]{40}/docs/media/codex-source-icon\.png$')
 
     def test_policy_skip_and_timeout_do_not_fall_back_to_duplicate_sends(self):
         with patch.object(self.m, 'quiet_now', return_value=True), patch.object(self.m.subprocess, 'run') as run:

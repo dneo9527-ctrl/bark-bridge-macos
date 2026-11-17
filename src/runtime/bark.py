@@ -46,7 +46,7 @@ CODEX_EVENT_DEFAULTS = {"permission": True, "question": True, "complete": True}
 # Public, immutable artwork; never include device or chat information in this URL.
 # Bark on iOS 15+ fetches it. The Mac only sends the optional API field.
 SOURCE_ICONS = {
-    "codex": "https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/24c4e31207c78876b1e382710ac83bb2a3201315/docs/media/app-icon.png",
+    "codex": "https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/c664b67c01a44e9ed698dfccc69d1c6b5d1763b4/docs/media/codex-source-icon.png",
 }
 
 QUESTION_TOOLS = re.compile(r"(?:^|__|\.)(?:request_user_input|request_user_input_async|ask_user|ask_user_question)$")
@@ -816,6 +816,9 @@ def failure_reason(returncode, http, accepted=False):
 def send_target(device, title, body, group, source_id=None):
     try:
         payload = {"device_key": device["device_key"], "title": title, "body": body, "group": group, "isArchive": "0"}
+        # Codex reminders remain in phone Bark history, including generic previews.
+        # Preserve the existing archive policy for every other source/legacy caller.
+        if source_id == "codex": payload["isArchive"] = "1"
         icon = SOURCE_ICONS.get(source_id)
         if icon: payload["icon"] = icon
         result = subprocess.run([

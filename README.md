@@ -32,7 +32,7 @@
 | --- | --- |
 | 找到需要处理的聊天 | 支持的授权、提问、完成事件可带聊天名；名称无法确定时保留短编号，避免串名 |
 | 看清问题与选项 | 支持短问题和选项预览；可关闭手机内容预览 |
-| 识别 Codex 提醒 | 2.6.1 起附带陶瓷铃铛来源图标；需 iOS 15+ Bark，手机实际渲染尚未验收 |
+| 识别 Codex 提醒 | 2.6.1 起使用 Codex 自身图标，并将 Codex 提醒保存到手机 Bark 历史；需 iOS 15+，已由本机用户确认单台 iPhone 显示和留存 |
 | 选择接收手机 | 保存多台设备，独立启停，并按来源路由；指定设备已停用时跳过，不改投其他设备 |
 | 少受打扰 | 全局暂停、单来源临时静音、每日勿扰，跳过后不积压补发 |
 | 切换提醒场景 | “需要我时”“离开电脑”“专注片刻”；预设只组合开关，不自动检测离开 |
@@ -134,4 +134,4 @@ iPhone 需安装 Bark、允许通知并保持可用网络；Wi-Fi 或移动网�
 
 遇到问题，可在 [Issues](https://github.com/dneo9527-ctrl/bark-bridge-macos/issues) 描述 Mac／Codex 版本、触发场景及脱敏错误类别。提交截图前请隐藏聊天内容、设备地址和密钥。欢迎通过 Pull Request 改进兼容性、文档与测试。
 
-本项目自己的代码采用 [MIT 许可证](LICENSE)。安装包内嵌 Python 及依赖，来源固定于 [运行时清单](assets/python-runtime.json)，各自许可见 [第三方许可](assets/python-licenses)。独立社区工具，与 Bark、OpenAI、Anthropic 无官方关联。图标由本项目的 AI 设计流程生成并适配，不使用 Bark 官方图标。插图与视频为功能示意，非实机录屏或送达证据。
+本项目自己的代码采用 [MIT 许可证](LICENSE)。安装包内嵌 Python 及依赖，来源固定于 [运行时清单](assets/python-runtime.json)，各自许可见 [第三方许可](assets/python-licenses)。独立社区工具，与 Bark、OpenAI、Anthropic 无官方关联。Bark Bridge 应用图标由本项目的 AI 设计流程生成并适配，不使用 Bark 官方图标。Codex 来源图标归 OpenAI，不包含在本项目 MIT 授权内，见[第三方图稿说明](docs/THIRD_PARTY_ARTWORK.md)。插图与视频为功能示意，非实机录屏或送达证据。
