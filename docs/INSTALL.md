@@ -2,19 +2,19 @@
 
 [← 返回项目首页](../README.md)
 
-当前为 **2.6.0 正式版 · Build 47**，已封装为原生 macOS `.app`，有菜单栏铃铛与独立设置窗口。这是 GitHub 下载分发，未上架 App Store。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
+当前为 **2.6.1 正式版 · Build 48**，已封装为原生 macOS `.app`，有菜单栏铃铛与独立设置窗口。这是 GitHub 下载分发，未上架 App Store。Apple Silicon 图形安装助手及源码安装器只支持首次安装，不覆盖已有安装；2.6.0+ 客户端另有签名程序更新。
 
 ## 下载图形安装包
 
-1. **下载 [Bark-Bridge-2.6.0-macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0/Bark-Bridge-2.6.0-macOS-arm64.zip)**（约 32 MB；精确大小与摘要见 Release），完整解压后先阅读 `Start Here.html`。
+1. **下载 [Bark-Bridge-2.6.1-macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.1/Bark-Bridge-2.6.1-macOS-arm64.zip)**（约 32 MB；精确大小与摘要见 Release），完整解压后先阅读 `Start Here.html`。
 2. 打开 `Install Bark Bridge.app`，查看安装位置与 Codex 接入选项，再点击“安装并打开”。此包内置 Python，无需自行安装 Xcode、Python 或 pip。
 3. 安装完成后添加接收设备，在 iPhone 上确认收到测试。未找到 Codex CLI 时可先安装 App，稍后按下文接入。
 
 | 附件 | 使用者与用途 |
 | --- | --- |
-| `Bark-Bridge-2.6.0-macOS-arm64.zip` | 新用户首次安装；含已封装的 App、图形助手及 Python 3.13.18，不需要终端、Xcode 或编译 |
-| `Bark-Bridge-2.6.0-macOS-arm64-update.zip` | 已启用 2.6+ 更新客户端的用户；由客户端验证同 Release 的 JSON 清单及 Ed25519 `.sig`，不要手动覆盖程序 |
-| `Bark-Bridge-2.6.0-source.zip` | 开发者审查/自行构建；不是普通用户的首次安装包 |
+| `Bark-Bridge-2.6.1-macOS-arm64.zip` | 新用户首次安装；含已封装的 App、图形助手及 Python 3.13.18，不需要终端、Xcode 或编译 |
+| `Bark-Bridge-2.6.1-macOS-arm64-update.zip` | 已启用 2.6+ 更新客户端的用户；由客户端验证同 Release 的 JSON 清单及 Ed25519 `.sig`，不要手动覆盖程序 |
+| `Bark-Bridge-2.6.1-source.zip` | 开发者审查/自行构建；不是普通用户的首次安装包 |
 
 当前安装包只分发 Apple Silicon（M 系列）。编译最低目标 macOS 13，实际界面仅在 macOS 26 arm64 本机验证；没有宣称 Intel 或 macOS 13 实机通过。下方“获取源码”和“环境与构建”仅面向开发者，图形包用户不需要执行。
 

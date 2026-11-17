@@ -5,10 +5,10 @@
   <p>把 Codex 的授权、提问和本轮完成提醒，送到 iPhone Bark。<br>同一 Mac 用户共用设备配置，现有接入目录换号继续用。</p>
   <p>
     <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml"><img src="https://github.com/dneo9527-ctrl/bark-bridge-macos/actions/workflows/checks.yml/badge.svg" alt="macOS 测试与构建状态"></a>
-    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/version.svg" alt="2.6.0 正式版"></a>
+    <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.1"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/version.svg" alt="2.6.1 正式版"></a>
     <a href="LICENSE"><img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/license.svg" alt="MIT 许可证"></a>
   </p>
-  <p><a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0/Bark-Bridge-2.6.0-macOS-arm64.zip"><strong>下载 Mac App 安装包 · 约 32 MB</strong></a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.5.0-preview.1/Bark-Bridge-30s-demo.mp4">30 秒演示（v2.5 核心流程示意）</a> · <a href="docs/INSTALL.md">安装与接入</a> · <a href="docs/PRIVACY.md">隐私说明</a></p>
+  <p><a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.1/Bark-Bridge-2.6.1-macOS-arm64.zip"><strong>下载 Mac App 安装包 · 约 32 MB</strong></a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.5.0-preview.1/Bark-Bridge-30s-demo.mp4">30 秒演示（v2.5 核心流程示意）</a> · <a href="docs/INSTALL.md">安装与接入</a> · <a href="docs/PRIVACY.md">隐私说明</a></p>
 </div>
 
 <picture>
@@ -16,7 +16,7 @@
   <img src="https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/main/docs/media/overview.svg" width="1320" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。">
 </picture>
 
-> **已封装为原生 macOS `.app`。** 安装后有菜单栏铃铛和独立设置窗口；Apple Silicon 安装 ZIP 内含图形安装助手及 Python 3.13.18，普通用户不用终端、Xcode 或自行装 Python。当前是 GitHub 2.6.0 正式分发，未上架 App Store，未使用 Developer ID 签名或 Apple 公证。插图和视频均为功能示意。
+> **已封装为原生 macOS `.app`。** 安装后有菜单栏铃铛和独立设置窗口；Apple Silicon 安装 ZIP 内含图形安装助手及 Python 3.13.18，普通用户不用终端、Xcode 或自行装 Python。当前是 GitHub 2.6.1 正式分发，未上架 App Store，未使用 Developer ID 签名或 Apple 公证。插图和视频均为功能示意。
 
 ## 离开电脑，也知道下一步
 
@@ -32,6 +32,7 @@
 | --- | --- |
 | 找到需要处理的聊天 | 支持的授权、提问、完成事件可带聊天名；名称无法确定时保留短编号，避免串名 |
 | 看清问题与选项 | 支持短问题和选项预览；可关闭手机内容预览 |
+| 识别 Codex 提醒 | 2.6.1 起附带陶瓷铃铛来源图标；需 iOS 15+ Bark，手机实际渲染尚未验收 |
 | 选择接收手机 | 保存多台设备，独立启停，并按来源路由；指定设备已停用时跳过，不改投其他设备 |
 | 少受打扰 | 全局暂停、单来源临时静音、每日勿扰，跳过后不积压补发 |
 | 切换提醒场景 | “需要我时”“离开电脑”“专注片刻”；预设只组合开关，不自动检测离开 |
@@ -57,15 +58,15 @@
 
 ## 快速开始
 
-**新用户下载：[Bark-Bridge-2.6.0-macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0/Bark-Bridge-2.6.0-macOS-arm64.zip)**（约 32 MB；精确大小与摘要见 Release）。完整解压，双击 `Install Bark Bridge.app`，查看安装位置与 Codex 接入选项，再点击“安装并打开”，助手会安装 `/Applications/Bark.app`。解压目录内 `Start Here.html` 提供操作说明。这是已封装的 App，不需要用户编译。
+**新用户下载：[Bark-Bridge-2.6.1-macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.1/Bark-Bridge-2.6.1-macOS-arm64.zip)**（约 32 MB；精确大小与摘要见 Release）。完整解压，双击 `Install Bark Bridge.app`，查看安装位置与 Codex 接入选项，再点击“安装并打开”，助手会安装 `/Applications/Bark.app`。解压目录内 `Start Here.html` 提供操作说明。这是已封装的 App，不需要用户编译。
 
 | 附件类型 | 下载哪个 | 用途 |
 | --- | --- | --- |
-| **首次安装 · 推荐新用户** | [macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0/Bark-Bridge-2.6.0-macOS-arm64.zip) | 已封装的 App、安装助手与内置 Python；只用于没有旧安装的 Mac |
-| 程序更新 | `Bark-Bridge-2.6.0-macOS-arm64-update.zip` | 供 2.6+ 客户端校验同一 Release 的签名清单后安装，不要自行覆盖安装目录 |
-| 源码 | [Bark-Bridge-2.6.0-source.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.0/Bark-Bridge-2.6.0-source.zip) | 开发、审查和自行构建，普通安装不用下载 |
+| **首次安装 · 推荐新用户** | [macOS-arm64.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.1/Bark-Bridge-2.6.1-macOS-arm64.zip) | 已封装的 App、安装助手与内置 Python；只用于没有旧安装的 Mac |
+| 程序更新 | `Bark-Bridge-2.6.1-macOS-arm64-update.zip` | 供 2.6+ 客户端校验同一 Release 的签名清单后安装，不要自行覆盖安装目录 |
+| 源码 | [Bark-Bridge-2.6.1-source.zip](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.1/Bark-Bridge-2.6.1-source.zip) | 开发、审查和自行构建，普通安装不用下载 |
 
-`bark-update-arm64.json` 和 `.sig` 供更新客户端验证；`SHA256SUMS` 用于核对附件摘要。[完整附件与发布核验](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0)。
+`bark-update-arm64.json` 和 `.sig` 供更新客户端验证；`SHA256SUMS` 用于核对附件摘要。[完整附件与发布核验](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.1)。
 
 **2.6.0 起提供软件更新功能。** 设置中可检查更新、选择自动下载；自动下载默认关闭，开启后每 12 小时按需检查。下载并校验完成后仍需点击“重启并更新”才安装。更新保留设备、既有 Hook/Skill 入口及授权策略，详情见 [更新说明](docs/UPDATES.md)。
 
@@ -88,7 +89,7 @@ cd bark-bridge-macos
 /usr/bin/python3 scripts/build.py
 ```
 
-也可以从 [Releases](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.0) 下载源码 ZIP，解压后进入目录。构建只生成 `build/Bark.app`，不会安装或启动。
+也可以从 [Releases](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.1) 下载源码 ZIP，解压后进入目录。构建只生成 `build/Bark.app`，不会安装或启动。
 
 ### 2. 预览并明确安装
 

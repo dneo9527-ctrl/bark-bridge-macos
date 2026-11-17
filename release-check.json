@@ -1,76 +1,50 @@
 {
-  "version": "2.6.0",
-  "build": 47,
-  "tag": "v2.6.0",
+  "version": "2.6.1",
+  "build": 48,
+  "tag": "v2.6.1",
   "channel": "stable",
-  "distribution": "GitHub stable; Apple Silicon first-install and Ed25519 program-update archives",
+  "distribution": "GitHub candidate; Apple Silicon first-install and Ed25519 program-update archives",
   "license": "MIT",
-  "verification_status": "local_checks_passed",
+  "verification_status": "local_tests_passed_publication_pending",
   "signature": "ad-hoc; not Developer ID or notarized",
-  "prior_evidence": "The earlier v2.6.0-preview.1 release retains its own tests and asset verification. Those results are not relabeled as the current build.",
-  "publication": "Exact source commit, CI and final artifacts are recorded in the v2.6.0 Release.",
-  "unverified": [
-    "fresh physical Mac quarantine first-open",
-    "Developer ID and notarization",
-    "Intel and macOS13 physical device",
-    "long-term idle battery impact",
-    "new end-to-end physical iPhone delivery"
-  ],
-  "new_daemons": 0,
-  "installed_config_read": false,
-  "python_test_executions_per_interpreter": 283,
-  "python_test_passed_per_interpreter": 282,
+  "python_test_executions_per_interpreter": 290,
+  "python_test_passed_per_interpreter": 289,
   "python_test_skipped_per_interpreter": 1,
   "interpreters": [
     "system Python3.9.6",
     "bundled Python3.13.18"
   ],
-  "skip_reason": "Optional real Codex test; real CLI first-install hook trust was separately checked in temporary CODEX_HOME.",
+  "skip_reason": "Optional real Codex CLI test; no Hook or Skill implementation changes in this patch.",
   "native_build": "AppleSilicon passed",
-  "isolated_first_install": {
-    "archive_checksum": true,
-    "extracted_installer_signature": true,
-    "payload_matches_public_sources": true,
-    "upstream_public_ca_bundle_unchanged": true,
-    "private_state_absent": true,
-    "gui_honors_cli_override": true,
-    "isolated_first_install": true,
-    "bundled_python_status": true,
-    "trusted_hooks": 4,
-    "existing_install_refused": true,
-    "policy_and_unrelated_hooks_preserved": true,
-    "permission_hook_neutral": true,
-    "runtime_mode": "0700",
-    "manifest_mode": "0600",
-    "real_user_state_written": false
+  "base_public_main": "7f207d2b75b87e8f2dd678f6a045b07d2cfa69cc",
+  "codex_notification_icon": {
+    "source_aware": true,
+    "ios_minimum": 15,
+    "immutable_public_asset": true,
+    "http": 200,
+    "bytes": 62122,
+    "dimensions": [
+      256,
+      256
+    ],
+    "sha256": "f29182be23ff090cd69b1023b3d04b4836c5a53754036a445a15a7505ff19a76",
+    "matches_repository_artwork": true,
+    "phone_rendering": "not_run",
+    "mac_image_fetches_added": 0,
+    "new_regression_tests": 7
   },
-  "isolated_update": {
-    "baseline": "Actual v2.6.0-preview.1 public App, verifier and updater, no version override",
-    "target": "v2.6.0",
-    "network": "local frozen assets",
-    "scope": "Disposable app/runtime, fake data; apply(restart=False), no real installation or GUI restart",
-    "real_user_state_written": false,
-    "tampered_manifest_rejected": true,
-    "manifest": {
-      "tag": "v2.6.0",
-      "build": 47,
-      "size": 3220061,
-      "sha256": "d2f4eccb0a8f240fcf73f46972632118fe39fb1e5de07d9e50299f9d9dbda3c4"
-    },
-    "apply": {
-      "ok": true,
-      "updated": true
-    },
-    "status": "passed",
-    "installed": {
-      "version": "2.6.0",
-      "build": "47",
-      "tag": "v2.6.0",
-      "preview": false
-    },
-    "transaction": "complete",
-    "private_sentinels_unchanged": true,
-    "installed_deep_codesign": true,
-    "old_public_verifier_accepted_new_signature": true
-  }
+  "new_daemons": 0,
+  "installed_config_read": false,
+  "live_installation_modified": false,
+  "prior_evidence": "Build47 verification remains in docs/VERIFICATION.md and the unchanged v2.6.0 Release; not relabeled as Build48.",
+  "publication": "Pending publishing-chat handoff. Exact source SHA, CI, signed artifacts and download receipts must be recorded by the publisher.",
+  "unverified": [
+    "physical iPhone icon rendering and image-unavailable fallback",
+    "new candidate public CI and anonymous release download",
+    "fresh physical Mac quarantine first-open",
+    "Developer ID and notarization",
+    "Intel and macOS13 physical device",
+    "long-term idle battery impact",
+    "native App restart for this candidate"
+  ]
 }

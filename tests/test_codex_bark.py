@@ -72,7 +72,8 @@ class NotifierTests(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 1)
         self.assertEqual((r.returncode, r.stdout, r.stderr), (0, '', ''))
         for _ in range(40):
-            if self.m.LOG.exists():
+            # Opening the log can create an empty file before the worker writes.
+            if self.m.LOG.exists() and 'send_failed' in self.m.LOG.read_text():
                 break
             time.sleep(.05)
         self.assertIn('send_failed', self.m.LOG.read_text())

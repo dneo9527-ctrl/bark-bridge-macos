@@ -43,6 +43,11 @@ REASONS.add("event_disabled")
 STATUSES.add("source_muted")
 REASONS.add("source_muted")
 CODEX_EVENT_DEFAULTS = {"permission": True, "question": True, "complete": True}
+# Public, immutable artwork; never include device or chat information in this URL.
+# Bark on iOS 15+ fetches it. The Mac only sends the optional API field.
+SOURCE_ICONS = {
+    "codex": "https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/24c4e31207c78876b1e382710ac83bb2a3201315/docs/media/app-icon.png",
+}
 
 QUESTION_TOOLS = re.compile(r"(?:^|__|\.)(?:request_user_input|request_user_input_async|ask_user|ask_user_question)$")
 CONTEXT = f"""Local user preference: use the codex-bark-wait skill before asking a question or presenting choices that require a reply. Read {BASE / "skill/SKILL.md"}. The user requested chat names and short question/option previews on their existing Bark phone. Supply the minimal question and choice labels to wait --preview-json through stdin, never credentials, commands or transcripts. Failures must not block work. PermissionRequest and supported question tools have hooks. Do not change permissions or approve actions. Never read or print the Bark config or any account credential."""
@@ -808,9 +813,11 @@ def failure_reason(returncode, http, accepted=False):
     return "accepted" if 200 <= http < 300 and accepted else "api_rejected"
 
 
-def send_target(device, title, body, group):
+def send_target(device, title, body, group, source_id=None):
     try:
         payload = {"device_key": device["device_key"], "title": title, "body": body, "group": group, "isArchive": "0"}
+        icon = SOURCE_ICONS.get(source_id)
+        if icon: payload["icon"] = icon
         result = subprocess.run([
             "/usr/bin/curl", "--silent", "--show-error", "--connect-timeout", "4",
             "--max-time", "8", "--max-filesize", "32768", "--retry", "0",
@@ -888,10 +895,10 @@ def deliver(event, force=False, device_id=None, report=None):
             body = "你指定的任务已结束，请返回 Mac 查看结果。" if success else "你指定的任务以非零状态退出，请返回 Mac 检查。"
         group = str(event.get("source", "Mac 应用")) if kind in ("application", "source_test", "battery") else "Codex"
         if source_id == "claude-code": group = "Claude Code"
-        if len(devices) == 1: results = [send_target(devices[0], title, body, group)]
+        if len(devices) == 1: results = [send_target(devices[0], title, body, group, source_id)]
         else:
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(devices))) as pool:
-                results = list(pool.map(lambda x: send_target(x, title, body, group), devices))
+                results = list(pool.map(lambda x: send_target(x, title, body, group, source_id), devices))
         # The two-field form remains accepted for existing local integrations/tests.
         results = [(x[0], x[1], x[2] if len(x) > 2 else failure_reason(0, x[1], x[0])) for x in results]
         accepted = sum(bool(x[0]) for x in results)
