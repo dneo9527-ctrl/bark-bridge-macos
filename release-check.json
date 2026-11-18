@@ -1,20 +1,20 @@
 {
   "version": "2.6.2",
-  "build": 51,
-  "tag": "v2.6.2-preview.2",
+  "build": 52,
+  "tag": "v2.6.2-preview.3",
   "channel": "preview",
   "license": "MIT",
-  "verification_status": "frozen_Build51_publisher_preparation_CI_pending",
+  "verification_status": "Build52_frozen_program_publisher_docs_native_live_model_unavailable_CI_pending",
   "signature": "ad-hoc; not Developer ID or notarized",
   "base_public_main": "b36f24ce4a4f2f936a123153f8cce1836dd90c5a",
-  "python_test_executions_per_interpreter": 330,
-  "python_test_passed_per_interpreter": 329,
+  "python_test_executions_per_interpreter": 354,
+  "python_test_passed_per_interpreter": 353,
   "python_test_skipped_per_interpreter": 1,
   "skip_reason": "Optional real Codex CLI test; Hook behavior unchanged.",
   "native_build": "Apple Silicon passed",
   "new_daemons": 0,
   "installed_config_read": false,
-  "publication": "Public candidate branch/draft preparation; no new public release yet",
+  "publication": "Public preview candidate preparation; no new public release yet",
   "relocation": {
     "bookmark": "ordinary macOS CFURL bookmark",
     "launcher": "stable manage.py launch-app",
@@ -31,14 +31,14 @@
     "Developer ID and notarization",
     "Intel and macOS13 physical device",
     "long-term idle battery impact",
-    "real Agy model task after new adapter (synthetic CLI lifecycle tested)",
-    "Agy phone receipt confirmed by user"
+    "iPhone receipt of native source test not confirmed",
+    "native real question/completion and dynamicHook neutrality: blocked by model unavailable;own testcancelled"
   ],
   "interpreters": [
     "system Python3.9.6",
     "distribution Python3.13.18"
   ],
-  "agy": {
+  "agy_console_legacy": {
     "scope": "compatible local Agy Console terminal events",
     "producer_version": "0.1.0-preview.13",
     "events": [
@@ -58,9 +58,33 @@
       "headless approval/question waiting",
       "standalone Agy CLI",
       "Antigravity IDE"
-    ]
+    ],
+    "scope_correction": "User requested native Antigravity.app; Build51 Console work was a misinterpretation, excluded from native support claims."
   },
-  "program_source_commit": "54a003cdfaa836bf607132f67ee21917b489b8fc",
-  "program_source_tree": "dd06f3d5901857c09175ef5133837a5d03e37643",
+  "antigravity_native": {
+    "bundle_id": "com.google.antigravity",
+    "app_version_checked": "2.32.2",
+    "hooks": [
+      "PreToolUse: ask_question|ask_permission",
+      "Stop: fully idle NO_TOOL_CALL only"
+    ],
+    "hook_output": "empty JSON; no permission decisions/overrides or forced execution",
+    "configuration": "merge named definition in global hooks.json with restricted backup",
+    "source_icon": "installed native App icon; unknown sources no Codex fallback",
+    "coverage": [
+      "ask_question question preview",
+      "ask_permission scoped resource request",
+      "confirmed normal completion"
+    ],
+    "not_guaranteed": [
+      "ordinary operation approvals",
+      "plain text questions",
+      "subagents/CLI/IDE",
+      "other Stop hooks causing continuation"
+    ],
+    "validation": "24 new isolated cases;354total eachPython;actual native icon viewed;synthetic installedHook chainHTTP200. RealnativeApp test returned Modelunavailable atattempt1/9 and was cancelled, so realquestion/completion notverified."
+  },
+  "program_source_commit": "3be2c04b3828feee30ce9c924bcff60216e1715e",
+  "program_source_tree": "3ee1f84bb254752264cd3351b28c604c56971896",
   "publisher_docs_only": true
 }

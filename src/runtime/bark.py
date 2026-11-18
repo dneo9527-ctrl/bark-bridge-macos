@@ -477,7 +477,7 @@ def set_route(source_id, data):
 
 
 PRESET_MODES = {"need", "away", "focus"}
-TEMPLATES = {"terminal": ("terminal-task", "终端长任务"), "shortcuts": ("shortcuts", "快捷指令"), "claude": ("claude-code", "Claude Code"), "agy": ("agy-console", "Agy Console")}
+TEMPLATES = {"terminal": ("terminal-task", "终端长任务"), "shortcuts": ("shortcuts", "快捷指令"), "claude": ("claude-code", "Claude Code"), "agy": ("agy-console", "Agy Console"), "antigravity": ("com.google.antigravity", "Antigravity")}
 
 
 def preset_state(settings):
@@ -531,6 +531,63 @@ def agy_event(data):
             "fingerprint": digest(["agy-console", identifiers[1], data["status"]]),
             "task_success": data["status"] == "completed",
             "chat_title": preview_text(data.get("chat_title"), 100)}
+
+
+def antigravity_event(data, hook):
+    """Native App metadata only. Path strings identify the surface, never read logs."""
+    if not isinstance(data, dict): return None
+    ident = chat_id(data.get("conversationId"))
+    if not ident or data.get("parentConversationId"): return None
+    root = Path.home() / ".gemini/antigravity/brain" / ident
+    paths = [("artifactDirectoryPath", root),
+             ("transcriptPath", root / ".system_generated/logs/transcript.jsonl")]
+    present = False
+    for key, expected in paths:
+        value = data.get(key)
+        if value is None: continue
+        if not isinstance(value, str) or len(value) > 4096: return None
+        path = Path(value).expanduser()
+        if not path.is_absolute() or os.path.normpath(str(path)) != str(expected): return None
+        present = True
+    if not present: return None
+    execution = data.get("executionId")
+    execution = execution if isinstance(execution, str) and 0 < len(execution) <= 128 else digest(data.get("lastUserInput"))
+    event = {"source_id": "com.google.antigravity", "origin": "integration",
+             "session": digest(["antigravity", ident]), "chat_ref": ident[:8]}
+    workspace = data.get("workspacePaths")
+    if isinstance(workspace, list) and workspace and isinstance(workspace[0], str) and len(workspace[0]) <= 4096:
+        event["project_label"] = preview_text(Path(workspace[0]).name, 60)
+    if hook == "pre-tool":
+        call = data.get("toolCall")
+        if not isinstance(call, dict) or call.get("name") not in ("ask_question", "ask_permission"): return None
+        step = data.get("stepIdx")
+        if type(step) is not int or step < 0: return None
+        tool = call["name"]
+        event.update(kind="question" if tool == "ask_question" else "permission", tool=tool,
+                     fingerprint=digest([execution, step, tool]))
+        if tool == "ask_question": event["questions"] = question_preview(call.get("args"))
+    elif hook == "stop":
+        if data.get("fullyIdle") is not True or data.get("continuationActive") is True: return None
+        if data.get("terminationReason") not in ("NO_TOOL_CALL", "model_stop"): return None
+        number = data.get("executionNum")
+        if type(number) is not int or number < 0: return None
+        event.update(kind="complete", fingerprint=digest([execution, number, "complete"]))
+    else: return None
+    return event
+
+
+def antigravity_label(event):
+    kind = event["kind"]
+    suffix = {"permission": "请求新增权限", "question": "等待回答", "complete": "本轮已完成"}[kind]
+    context = preview_text(event.get("project_label"), 60)
+    ref = event.get("chat_ref", "")
+    title = "Antigravity" + (" · " + context if context else "") + (" · " + ref if re.fullmatch(r"[a-f0-9]{8}", ref) else "") + " · " + suffix
+    body = {"permission": "Antigravity 正在申请新增资源权限，请返回 App 查看并决定。普通操作审批不保证覆盖。",
+            "question": "Antigravity 正在等待你的回答或选择，请返回 App。",
+            "complete": "Antigravity 已结束本轮回复，请返回 App 查看结果。"}[kind]
+    if kind == "question":
+        _, body = codex_label({**event, "chat_title": "Antigravity", "chat_id": None}, title, body)
+    return preview_text(title, 180), body
 
 
 def claude_label(event):
@@ -704,6 +761,11 @@ def add_sources(paths):
 
 
 def change_source(source_id, enabled=None, remove=False):
+    if remove and source_id == "com.google.antigravity":
+        result = subprocess.run([python_executable(), str(BASE / "manage.py"), "antigravity-detach"], capture_output=True, timeout=8)
+        try: detached = json.loads(result.stdout)
+        except ValueError: detached = {}
+        if detached.get("ok") is not True: raise ValueError("antigravity_detach_failed")
     if remove and source_id == "claude-code" and (BASE / "claude_bark.py").is_file():
         result = subprocess.run([python_executable(), str(BASE / "claude_bark.py"), "detach"], capture_output=True, timeout=8)
         try: detached = json.loads(result.stdout)
@@ -832,7 +894,7 @@ def send_target(device, title, body, group, source_id=None):
         payload = {"device_key": device["device_key"], "title": title, "body": body, "group": group, "isArchive": "0"}
         # Codex reminders remain in phone Bark history, including generic previews.
         # Preserve the existing archive policy for every other source/legacy caller.
-        if source_id in ("codex", "agy-console"): payload["isArchive"] = "1"
+        if source_id in ("codex", "agy-console", "com.google.antigravity"): payload["isArchive"] = "1"
         icon = SOURCE_ICONS.get(source_id)
         if icon: payload["icon"] = icon
         result = subprocess.run([
@@ -906,6 +968,8 @@ def deliver(event, force=False, device_id=None, report=None):
         if source_id == "claude-code" and kind in ("permission", "question", "complete"):
             if settings["codex_preview"]: title, body = claude_label(event)
             else: title, body = claude_label({"kind": kind})
+        if source_id == "com.google.antigravity" and kind in ("permission", "question", "complete"):
+            title, body = antigravity_label(event if settings["codex_preview"] else {"kind": kind})
         if kind == "application" and source_id in ("terminal-task", "shortcuts"):
             success = event.get("task_success", True)
             title = ("终端任务" if source_id == "terminal-task" else "快捷指令") + (" · 已结束" if success else " · 执行失败")
@@ -918,6 +982,7 @@ def deliver(event, force=False, device_id=None, report=None):
             body = "Agy 控制台已完成本轮任务，请返回 Mac 查看结果。" if success else "Agy 控制台的本轮任务最终未完成，请返回 Mac 查看；通知不包含错误正文。"
         group = str(event.get("source", "Mac 应用")) if kind in ("application", "source_test", "battery") else "Codex"
         if source_id == "claude-code": group = "Claude Code"
+        if source_id == "com.google.antigravity": group = "Antigravity"
         if len(devices) == 1: results = [send_target(devices[0], title, body, group, source_id)]
         else:
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(devices))) as pool:
@@ -1150,7 +1215,8 @@ def configure_json():
 
 def main():
     parser = argparse.ArgumentParser(description="Codex Bark local notifier (never prints secrets)")
-    parser.add_argument("action", choices=["hook", "wait", "notify", "agy-event", "test", "configure", "status", "snapshot", "set-enabled", "pause-for", "configure-json", "sources-list", "source-add", "source-toggle", "source-remove", "source-test", "source-mute", "devices-migrate", "devices-list", "device-add", "device-toggle", "device-rename", "device-remove", "device-test", "test-json", "policy-get", "quiet-set", "route-set", "events-set", "preview-set", "diagnose", "history", "battery-event", "preset-set", "template-enable", "template-notify", "_worker"])
+    parser.add_argument("action", choices=["hook", "wait", "notify", "agy-event", "antigravity-hook", "test", "configure", "status", "snapshot", "set-enabled", "pause-for", "configure-json", "sources-list", "source-add", "source-toggle", "source-remove", "source-test", "source-mute", "devices-migrate", "devices-list", "device-add", "device-toggle", "device-rename", "device-remove", "device-test", "test-json", "policy-get", "quiet-set", "route-set", "events-set", "preview-set", "diagnose", "history", "battery-event", "preset-set", "template-enable", "template-notify", "_worker"])
+    parser.add_argument("--event", choices=["pre-tool", "stop"])
     parser.add_argument("value", nargs="?", choices=["on", "off", "toggle"])
     parser.add_argument("--session", default="")
     parser.add_argument("--preview-json", action="store_true")
@@ -1167,7 +1233,7 @@ def main():
     parser.add_argument("--view", choices=["menu", "panel", "history"], default="panel")
     parser.add_argument("--with-snapshot", action="store_true")
     parser.add_argument("--preset", choices=["need", "away", "focus"])
-    parser.add_argument("--template", choices=["terminal", "shortcuts", "claude", "agy"])
+    parser.add_argument("--template", choices=["terminal", "shortcuts", "claude", "agy", "antigravity"])
     parser.add_argument("--exit-code", type=int, default=0)
     args = parser.parse_args()
 
@@ -1280,6 +1346,11 @@ def main():
         if args.source_id:
             event["source_id"] = args.source_id
         dispatch(event)
+    elif args.action == "antigravity-hook":
+        try:
+            dispatch(antigravity_event(json.loads(sys.stdin.buffer.read(1048576)), args.event))
+        except Exception: pass
+        print("{}")
     elif args.action == "agy-event":
         dispatch(agy_event(json.loads(sys.stdin.buffer.read(4096))))
     elif args.action == "_worker":

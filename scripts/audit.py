@@ -8,7 +8,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 TOP = {'README.md', 'VERSION', 'LICENSE', '.gitignore', 'release-check.json'}
 DIRS = {'src', 'assets', 'scripts', 'tests', 'docs', '.github'}
-DENIED_NAMES = {'config.json', 'rules.json', 'sources.json', 'installation.json', 'claude_installation.json'}
+DENIED_NAMES = {'config.json', 'rules.json', 'sources.json', 'installation.json', 'claude_installation.json', 'antigravity_installation.json'}
 
 
 def source_files():

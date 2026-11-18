@@ -1073,7 +1073,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         dialog.informativeText = "Codex 与 Mac 低电量已内置。其他模板通过明确事件触发；选中应用不会自动读取全部系统通知。"
         let form = NSView(frame: NSRect(x: 0, y: 0, width: 350, height: 154))
         let choice = NSPopUpButton(frame: NSRect(x: 0, y: 122, width: 350, height: 26))
-        for (title, key) in [("终端长任务结束", "terminal"), ("快捷指令", "shortcuts"), ("Claude Code", "claude"), ("Agy Console", "agy")] {
+        for (title, key) in [("终端长任务结束", "terminal"), ("快捷指令", "shortcuts"), ("Claude Code", "claude"), ("Antigravity App", "antigravity")] {
             choice.addItem(withTitle: title); choice.lastItem?.representedObject = key
         }
         choice.setAccessibilityLabel("内置接入模板类型")
@@ -1081,7 +1081,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let summary = label("", size: 12, color: .secondaryLabelColor)
         summary.frame = NSRect(x: 0, y: 0, width: 350, height: 112)
         templateChoice = choice; templateDescription = summary
-        if selectedSourceID == "agy-console" { choice.selectItem(at: 3) }
+        if selectedSourceID == "com.google.antigravity" { choice.selectItem(at: 3) }
         choice.identifier = .init(claudeStatus["configured"] as? Bool == true ? "connected" : (claudeStatus["available"] as? Bool == true ? "available" : "missing"))
         templateSelectionChanged(); form.addSubview(choice); form.addSubview(summary)
         dialog.accessoryView = form; dialog.addButton(withTitle: "使用模板"); dialog.addButton(withTitle: "取消")
@@ -1089,12 +1089,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             defer { self.templateChoice = nil; self.templateDescription = nil }
             guard response == .alertFirstButtonReturn, let key = choice.selectedItem?.representedObject as? String else { return }
             if key == "claude" { self.connectClaude() }
-            else if key == "agy" {
-                self.mutate(["template-enable", "--template", "agy"]) { _ in
-                    self.buildPage()
-                    self.alert("Agy 提醒来源已添加", "接收兼容 Agy Console 发出的任务完成、最终失败事件，共用当前手机与提醒规则。\n控制台需包含 Bark 事件适配；单独的 Agy CLI、Antigravity IDE 和等待授权/回答暂不支持。\n来源原本停用时会保留停用，请在来源列表开启。")
-                }
-            }
+            else if key == "antigravity" { self.connectAntigravity() }
             else {
                 self.mutate(["template-enable", "--template", key]) { _ in
                     let command = key == "terminal" ? taskWrapperCommand + " /usr/bin/true" : barkScriptCommand + " template-notify --template shortcuts"
@@ -1112,8 +1107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             let status = templateChoice?.identifier?.rawValue
             let headline = status == "connected" ? "已配置本机提醒入口。" : (status == "available" ? "检测到 Claude Code，可合并接入。" : "未检测到 Claude Code CLI，待安装后接入。")
             templateDescription?.stringValue = headline + "\n接入授权、AskUserQuestion 与本轮结束事件。\n合并已有设置，修改前备份；不改授权策略。\n不读取聊天记录或账号凭据。重新打开会话后生效。"
-        } else if key == "agy" {
-            templateDescription?.stringValue = "Agy Console 任务完成、最终失败提醒。\n自动候补仅通知最终结果，取消不通知。\n需控制台具备 Bark 事件适配；共用现有手机。\n独立 CLI、IDE、等待授权/回答暂不支持。"
+        } else if key == "antigravity" {
+            templateDescription?.stringValue = "接入原生 Antigravity.app 的官方 Hook。\n支持 ask_question、新增资源权限申请与正常结束。\n普通操作审批没有独立事件，不保证覆盖。\n合并全局 Hook 并备份，不改变授权策略。"
         } else if key == "shortcuts" {
             templateDescription?.stringValue = "适用于 Mac 上的快捷指令工作流。\n启用来源后复制“运行 Shell 脚本”动作命令。\n把动作放在工作流末尾，运行到这里才推送。\n与其他应用共用手机、路由、静音及勿扰规则。"
         } else {
@@ -1134,6 +1129,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     }
                 } else {
                     self.alert("Claude Code 尚未接入", result["reason"] as? String == "cli_missing" ? "本机未检测到 Claude Code CLI。请从官方渠道安装后，回到内置模板接入；不需要另填手机地址。" : "本地版本或设置暂不可用。原有配置未覆盖，请检查后重试。")
+                }
+            }
+        }
+    }
+
+    func connectAntigravity() {
+        guard !busy else { return }
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.antigravity") else {
+            alert("未找到 Antigravity App", "请安装并打开一次 Antigravity.app，再使用这个模板。"); return
+        }
+        busy = true; updateWindowIfPresent()
+        backendQueue.async {
+            let result = backend(["antigravity-attach", "--app", app.path], script: "manage.py")
+            DispatchQueue.main.async {
+                self.busy = false; self.updateWindowIfPresent()
+                guard result["ok"] as? Bool == true else {
+                    self.alert("Antigravity 尚未接入", "Hook 合并未完成，原有配置已保留。请检查本机应用版本或 Hook 配置后重试。"); return
+                }
+                let input = try? JSONSerialization.data(withJSONObject: ["paths": [app.path]])
+                self.mutate(["source-add"], input: input) { _ in
+                    self.selectedSourceID = "com.google.antigravity"; self.buildPage()
+                    self.alert("Antigravity App 已接入", "请重新打开 Antigravity 会话，让官方 Hook 生效。\n支持工具提问、新增资源权限申请与正常结束；普通操作审批及直接文字提问不保证捕获。\n手机、静音和勿扰沿用现有设置，原本停用的来源保持停用。")
                 }
             }
         }
@@ -1161,7 +1178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         guard let source = selectedSource(), let id = source["id"] as? String else { return }
         let command: String
         if id == "terminal-task" { command = taskWrapperCommand + " /usr/bin/true" }
-        else if id == "claude-code" || id == "agy-console" { showTemplates(); return }
+        else if id == "claude-code" || id == "com.google.antigravity" { showTemplates(); return }
         else if id == "shortcuts" { command = barkScriptCommand + " template-notify --template shortcuts" }
         else { command = barkScriptCommand + " notify --source-id " + shellQuote(id) }
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(command, forType: .string)
@@ -1192,16 +1209,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let observed = source["status"] as? String == "observed"
         let cell = NSTableCellView(); cell.backgroundStyle = .normal
         let image: NSImage
-        if ["terminal-task", "shortcuts", "claude-code"].contains(id) {
-            image = NSImage(systemSymbolName: ["terminal-task":"terminal", "shortcuts":"square.stack.3d.up", "claude-code":"bubble.left.and.bubble.right"][id]!, accessibilityDescription: nil)!
+        if id == "com.google.antigravity", let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+            image = NSWorkspace.shared.icon(forFile: url.path)
+        } else if ["terminal-task", "shortcuts", "claude-code", "agy-console"].contains(id) {
+            image = NSImage(systemSymbolName: ["terminal-task":"terminal", "shortcuts":"square.stack.3d.up", "claude-code":"bubble.left.and.bubble.right", "agy-console":"terminal"][id]!, accessibilityDescription: nil)!
         } else if id == "mac-battery" {
             image = NSImage(systemSymbolName: "battery.25percent", accessibilityDescription: nil)!
         } else if let path = source["path"] as? String {
             image = NSWorkspace.shared.icon(forFile: path)
-        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
+        } else if id == "codex", let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
             image = NSWorkspace.shared.icon(forFile: url.path)
         } else {
-            image = NSImage(systemSymbolName: "terminal.fill", accessibilityDescription: nil)!
+            image = NSImage(systemSymbolName: "app", accessibilityDescription: nil)!
         }
         let icon = NSImageView(image: image); icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false

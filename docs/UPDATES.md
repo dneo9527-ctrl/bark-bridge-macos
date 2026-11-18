@@ -7,13 +7,13 @@
 - 预览版接收稳定版和 preview 更新，稳定版只接收稳定更新。只选择具有本机架构签名清单的 Release，现有旧版首次安装 ZIP 不会被当成更新包。
 - 检查使用固定公开仓库的 GitHub API，不读取 GitHub 登录或令牌。限流、断网和校验失败会显示可重试状态，不影响推送。
 
-## 2.6.2 preview.2 · Build 51 预览
+## 2.6.2 preview.3 · Build 52 预览
 
-此预览加入同卷移动 App 后的位置追踪与兼容 Agy Console 接收端。它的版本为 `2.6.2`，标签为 `v2.6.2-preview.2`，通道为 `preview`，不会替代 `v2.6.1` 稳定发行。
+此预览保留同卷移动 App 后的位置追踪，改为接入原生 Antigravity App 官方 Hook。它的版本为 `2.6.2`，标签为 `v2.6.2-preview.3`，通道为 `preview`，不会替代 `v2.6.1` 稳定发行。旧 Build 51 的 preview.2 草稿保留停发。
 
 **稳定版客户端只查稳定更新，因此不会自动显示此预览。** 已有预览客户端可通过签名更新流程选择符合条件的新版本；稳定版用户如需试用，先按维护者指导显式进入预览。首次安装助手只接受没有旧 App／共用运行目录的 Mac，不能用来覆盖升级。不要删除配置、手动解压 update.zip 覆盖程序或改写已签名 App 的通道文件。
 
-程序更新后需先打开一次，登记实际 App 的书签。移动范围及限制见 [RELOCATION.md](RELOCATION.md)，Agy 还需对应控制台生产者，见 [AGY.md](AGY.md)。
+程序更新后需先打开一次，登记实际 App 的书签。移动范围及限制见 [RELOCATION.md](RELOCATION.md)，原生 App 接入和未通过的现场验证见 [ANTIGRAVITY.md](ANTIGRAVITY.md)，不需要自建 Console。
 
 ## 2.6.1 · Codex 来源图标与手机历史
 

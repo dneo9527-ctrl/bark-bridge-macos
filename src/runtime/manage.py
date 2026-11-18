@@ -3,7 +3,9 @@
 import argparse
 import base64
 import ctypes
+from contextlib import contextmanager
 import datetime
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -806,7 +808,242 @@ def remove_own_trust(text, records):
     return "".join(out)
 
 
+ANTIGRAVITY_HOOKS_PATH = Path.home() / ".gemini/config/hooks.json"
+ANTIGRAVITY_HOOK_NAME = "bark-bridge-native"
+ANTIGRAVITY_MATCHER = r"^(ask_question|ask_permission)$"
+
+
+def _antigravity_file(path, limit=1048576):
+    """Read only the selected Hook/public adapter metadata file, never settings/auth."""
+    if path.is_symlink(): raise ValueError("unsafe_permissions")
+    if not path.exists(): return None, None
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(str(path), flags)
+    with os.fdopen(fd, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or stat.S_IMODE(info.st_mode) & 0o022 or info.st_size > limit):
+            raise ValueError("unsafe_permissions")
+        raw = stream.read(limit + 1)
+    if len(raw) > limit: raise ValueError("invalid_hooks")
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result: raise ValueError("invalid_hooks")
+            result[key] = value
+        return result
+    data = json.loads(raw, object_pairs_hook=unique)
+    if not isinstance(data, dict): raise ValueError("invalid_hooks")
+    return data, raw
+
+
+def _antigravity_manifest():
+    path = BASE / "antigravity_installation.json"
+    data, _ = _antigravity_file(path, 262144)
+    if data is not None and (data.get("schema") != 1
+                            or data.get("hook_target") != str(ANTIGRAVITY_HOOKS_PATH)):
+        raise ValueError("adapter_conflict")
+    return data, path
+
+
+def _antigravity_app(app=None):
+    if app is None:
+        manifest, _ = _antigravity_manifest()
+        app = manifest.get("app_path") if manifest else None
+    if not isinstance(app, (str, Path)): raise ValueError("app_not_found")
+    path = Path(app)
+    if not path.is_absolute() or path.is_symlink() or not path.is_dir(): raise ValueError("app_not_found")
+    info_path = path / "Contents/Info.plist"
+    if info_path.is_symlink() or not info_path.is_file() or info_path.stat().st_size > 1048576:
+        raise ValueError("app_not_found")
+    info = plistlib.loads(info_path.read_bytes())
+    executable = info.get("CFBundleExecutable")
+    if (info.get("CFBundleIdentifier") != "com.google.antigravity"
+            or not isinstance(executable, str) or Path(executable).name != executable):
+        raise ValueError("app_not_found")
+    binary = path / "Contents/MacOS" / executable
+    if not binary.is_file() or binary.is_symlink() or not os.access(binary, os.X_OK):
+        raise ValueError("app_not_found")
+    return path.resolve(), str(info.get("CFBundleShortVersionString", ""))[:40]
+
+
+def _antigravity_command(event):
+    return " ".join(shlex.quote(x) for x in [python_executable(), "-I", "-B", str(BASE / "bark.py"),
+                                           "antigravity-hook", "--event", event])
+
+
+def _antigravity_own_command(command):
+    if not isinstance(command, str): return False
+    try: tokens = shlex.split(command)
+    except ValueError: return False
+    return (len(tokens) == 7 and tokens[0] in ("/usr/bin/python3", str(BASE / "python/bin/python3"))
+            and tokens[1:4] == ["-I", "-B", str(BASE / "bark.py")]
+            and tokens[4:6] == ["antigravity-hook", "--event"] and tokens[6] in ("pre-tool", "stop"))
+
+
+def _antigravity_strip(definition):
+    """Remove only exact Bark commands, preserving user additions in our named group."""
+    if not isinstance(definition, dict): raise ValueError("adapter_conflict")
+    if "enabled" in definition and type(definition["enabled"]) is not bool:
+        raise ValueError("adapter_conflict")
+    clean, found = {}, False
+    for name, value in definition.items():
+        if name not in ("PreToolUse", "Stop"):
+            clean[name] = value
+            continue
+        if not isinstance(value, list): raise ValueError("adapter_conflict")
+        kept = []
+        for item in value:
+            if not isinstance(item, dict): raise ValueError("adapter_conflict")
+            if _antigravity_own_command(item.get("command")):
+                found = True
+                continue
+            if "hooks" not in item:
+                kept.append(item)
+                continue
+            if not isinstance(item["hooks"], list): raise ValueError("adapter_conflict")
+            hooks = [hook for hook in item["hooks"] if not (
+                isinstance(hook, dict) and _antigravity_own_command(hook.get("command")))]
+            removed = len(hooks) != len(item["hooks"])
+            found = found or removed
+            if not removed:
+                kept.append(item)
+            elif hooks or set(item) - {"matcher", "hooks"}:
+                kept.append(dict(item, hooks=hooks))
+        if kept or not value: clean[name] = kept
+    return clean, found
+
+
+def _antigravity_definition(definition=None):
+    clean, _ = _antigravity_strip(definition or {})
+    clean.setdefault("enabled", True)
+    clean.setdefault("PreToolUse", []).append({"matcher": ANTIGRAVITY_MATCHER,
+        "hooks": [{"type": "command", "command": _antigravity_command("pre-tool"), "timeout": 3}]})
+    clean.setdefault("Stop", []).append({"type": "command", "command": _antigravity_command("stop"), "timeout": 3})
+    return clean
+
+
+@contextmanager
+def _antigravity_lock():
+    target = ANTIGRAVITY_HOOKS_PATH
+    # Refuse user-controlled symlink components rather than following them to
+    # unrelated settings. macOS's public /var alias is outside the home prefix.
+    for parent in [target.parent] + list(target.parent.parents):
+        if parent == Path.home(): break
+        if parent.is_symlink(): raise ValueError("unsafe_permissions")
+        if Path.home() in target.parents and parent.exists():
+            info = parent.stat()
+            if not parent.is_dir() or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o022:
+                raise ValueError("unsafe_permissions")
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    info = target.parent.stat()
+    if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o022:
+        raise ValueError("unsafe_permissions")
+    lock_path = target.parent / ".bark-native-hooks.lock"
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
+            raise ValueError("unsafe_permissions")
+        os.fchmod(fd, 0o600)
+        try: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError: raise ValueError("adapter_busy") from None
+        yield
+    finally: os.close(fd)
+
+
+def antigravity_status(app=None):
+    available, version = False, None
+    try:
+        _, version = _antigravity_app(app)
+        available = True
+        data, _ = _antigravity_file(ANTIGRAVITY_HOOKS_PATH)
+        definition = (data or {}).get(ANTIGRAVITY_HOOK_NAME)
+        configured = False
+        enabled = False
+        if definition is not None:
+            _, found = _antigravity_strip(definition)
+            if not found: raise ValueError("adapter_conflict")
+            expected = _antigravity_definition(definition)
+            configured = definition == expected
+            enabled = definition.get("enabled", True) is True
+        return {"ok": True, "available": available, "version": version,
+                "configured": configured, "enabled": configured and enabled,
+                "reason": "attached" if configured and enabled else "disabled" if configured else "not_configured"}
+    except Exception as error:
+        reason = str(error) if str(error) in ("app_not_found", "unsafe_permissions", "adapter_conflict", "adapter_busy") else "invalid_hooks"
+        return {"ok": False, "available": available, "version": version, "configured": False, "enabled": False, "reason": reason}
+
+
+def antigravity_attach(app):
+    try:
+        app, _ = _antigravity_app(app)
+        with _antigravity_lock():
+            data, raw = _antigravity_file(ANTIGRAVITY_HOOKS_PATH)
+            data = data or {}
+            manifest, manifest_path = _antigravity_manifest()
+            definition = data.get(ANTIGRAVITY_HOOK_NAME)
+            if definition is not None and not _antigravity_strip(definition)[1]:
+                raise ValueError("adapter_conflict")
+            updated = dict(data, **{ANTIGRAVITY_HOOK_NAME: _antigravity_definition(definition)})
+            if updated == data and manifest is not None and manifest.get("app_path") == str(app):
+                return {"ok": True, "configured": True, "reason": "attached"}
+            timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            backup_dir = BASE / "backups" / ("antigravity-" + timestamp)
+            backup_dir.mkdir(parents=True, mode=0o700)
+            if raw is not None: atomic(backup_dir / "hooks.json", raw.decode("utf-8"))
+            record = {"schema": 1, "hook_target": str(ANTIGRAVITY_HOOKS_PATH), "app_path": str(app),
+                      "hook_name": ANTIGRAVITY_HOOK_NAME, "hooks_existed": manifest.get("hooks_existed") if manifest else raw is not None,
+                      "backups": (manifest.get("backups", []) if manifest else []) + [str(backup_dir)]}
+            if _antigravity_file(ANTIGRAVITY_HOOKS_PATH)[1] != raw:
+                raise ValueError("adapter_conflict")
+            written = json.dumps(updated, ensure_ascii=False, indent=2) + "\n"
+            try:
+                atomic(ANTIGRAVITY_HOOKS_PATH, written)
+                atomic(manifest_path, json.dumps(record, ensure_ascii=False, indent=2) + "\n")
+            except Exception:
+                # Do not overwrite a third party's edit made after our write.
+                if _antigravity_file(ANTIGRAVITY_HOOKS_PATH)[1] == written.encode("utf-8"):
+                    if raw is None: ANTIGRAVITY_HOOKS_PATH.unlink(missing_ok=True)
+                    else: atomic(ANTIGRAVITY_HOOKS_PATH, raw.decode("utf-8"))
+                raise
+        return {"ok": True, "configured": True, "reason": "attached"}
+    except Exception as error:
+        reason = str(error) if str(error) in ("app_not_found", "unsafe_permissions", "adapter_conflict", "adapter_busy") else "invalid_hooks"
+        return {"ok": False, "configured": False, "reason": reason}
+
+
+def antigravity_detach():
+    try:
+        with _antigravity_lock():
+            data, raw = _antigravity_file(ANTIGRAVITY_HOOKS_PATH)
+            manifest, manifest_path = _antigravity_manifest()
+            if data is not None and ANTIGRAVITY_HOOK_NAME in data:
+                clean, found = _antigravity_strip(data[ANTIGRAVITY_HOOK_NAME])
+                if found:
+                    updated = dict(data)
+                    if set(clean) <= {"enabled"}: updated.pop(ANTIGRAVITY_HOOK_NAME)
+                    else: updated[ANTIGRAVITY_HOOK_NAME] = clean
+                    if _antigravity_file(ANTIGRAVITY_HOOKS_PATH)[1] != raw:
+                        raise ValueError("adapter_conflict")
+                    if not updated and manifest and manifest.get("hooks_existed") is False:
+                        ANTIGRAVITY_HOOKS_PATH.unlink()
+                    else: atomic(ANTIGRAVITY_HOOKS_PATH, json.dumps(updated, ensure_ascii=False, indent=2) + "\n")
+            manifest_path.unlink(missing_ok=True)
+        return {"ok": True, "configured": False, "reason": "detached"}
+    except Exception as error:
+        reason = str(error) if str(error) in ("unsafe_permissions", "adapter_conflict", "adapter_busy") else "invalid_hooks"
+        return {"ok": False, "configured": False, "reason": reason}
+
+
 def uninstall():
+    # Detach before any destructive removal so no native hook references a
+    # deleted receiver. A conflict leaves installed programs/data untouched.
+    if (BASE / "antigravity_installation.json").exists():
+        detached = antigravity_detach()
+        if detached.get("ok") is not True:
+            print("Antigravity 通知入口未能移除，已停止卸载，请检查本地 Hook 配置后重试。")
+            return
     adapter = BASE / "claude_bark.py"
     if adapter.is_file():
         result = subprocess.run([python_executable(), str(adapter), "detach"], capture_output=True, timeout=5)
@@ -880,12 +1117,18 @@ def main():
     os.umask(0o077)
     p = argparse.ArgumentParser()
     p.add_argument("action", choices=["attach", "check", "uninstall", "health", "support-report",
+                                     "antigravity-attach", "antigravity-status", "antigravity-detach",
                                      "app-register", "app-locate", "launch-app", "login-set"])
     p.add_argument("home", nargs="?", default=str(Path.home() / ".codex"))
     p.add_argument("--app", type=Path)
     p.add_argument("--with-cc-switch", action="store_true", help="Explicitly merge Bark Hook trust into CC Switch common config")
     a = p.parse_args()
-    if a.action in ("app-register", "app-locate", "launch-app", "login-set"):
+    if a.action in ("antigravity-attach", "antigravity-status", "antigravity-detach"):
+        result = (antigravity_attach(a.app) if a.action == "antigravity-attach" else
+                  antigravity_status(a.app) if a.action == "antigravity-status" else antigravity_detach())
+        print(json.dumps(result, ensure_ascii=False))
+        if result.get("ok") is not True: raise SystemExit(1)
+    elif a.action in ("app-register", "app-locate", "launch-app", "login-set"):
         try:
             if a.action == "app-register":
                 if a.app is None:
