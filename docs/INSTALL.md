@@ -22,6 +22,8 @@
 
 安装到 `/Applications/Bark.app`，共用运行目录为 `~/Library/Application Support/CodexBark`；需要当前用户对 Applications 有写权限，不自动请求 sudo。已有 App、运行目录或指向它们的符号链接都会阻止安装。安装助手不会升级已有用户版本。
 
+2.6.2 开发候选支持安装后移动实际 App 或改名，共用运行目录保留在原位置；登录入口和程序更新会跟随 App。首次升级后需先打开一次完成登记，适用范围与限制见[移动说明](RELOCATION.md)。公开 2.6.1 尚不包含此改动。
+
 嵌入式 Python 固定为 python-build-standalone 3.13.18（20261110），下载哈希见 `assets/python-runtime.json`。运行时和许可一起复制到共用目录，Hook、Skill、菜单及面板优先使用它。源码首次安装仍可使用系统 Python。
 
 ## 已有 2.4.x / 2.5.x 安装

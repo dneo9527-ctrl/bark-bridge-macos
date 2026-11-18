@@ -4,6 +4,7 @@
 #import <signal.h>
 #import <sys/file.h>
 #import <fcntl.h>
+#import <libproc.h>
 #import <IOKit/ps/IOPowerSources.h>
 #import <IOKit/ps/IOPSKeys.h>
 
@@ -23,9 +24,18 @@ static NSUInteger MemoryMB(void) {
     mach_task_basic_info_data_t info; mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
     return task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) == KERN_SUCCESS ? info.resident_size / 1024 / 1024 : 0;
 }
-static NSDictionary *Backend(NSArray *arguments) {
+// proc_pidpath follows a running executable when Finder moves its bundle.
+static NSString *CurrentAppPath(void) {
+    char path[PROC_PIDPATHINFO_MAXSIZE] = {0};
+    if (proc_pidpath(getpid(), path, sizeof(path)) > 0) {
+        NSString *binary = [NSString stringWithUTF8String:path];
+        return [[[binary stringByDeletingLastPathComponent] stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+    }
+    return NSBundle.mainBundle.bundlePath.stringByResolvingSymlinksInPath;
+}
+static NSDictionary *Program(NSString *script, NSArray *arguments) {
     NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:Python()];
-    task.arguments = [@[[Support() stringByAppendingPathComponent:@"bark.py"]] arrayByAddingObjectsFromArray:arguments];
+    task.arguments = [@[@"-I", @"-B", [Support() stringByAppendingPathComponent:script]] arrayByAddingObjectsFromArray:arguments];
     NSPipe *pipe = [NSPipe pipe]; task.standardOutput = pipe; task.standardError = NSFileHandle.fileHandleWithNullDevice;
     task.standardInput = NSFileHandle.fileHandleWithNullDevice;
     if (![task launchAndReturnError:nil]) return @{};
@@ -39,6 +49,11 @@ static NSDictionary *Backend(NSArray *arguments) {
     if ([object isKindOfClass:NSDictionary.class]) return object;
     NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
     return @{@"accepted": @([text containsString:@"服务器已接受"])};
+}
+
+static NSDictionary *Backend(NSArray *arguments) { return Program(@"bark.py", arguments); }
+static void RegisterLocation(void) {
+    Program(@"manage.py", @[@"app-register", @"--app", CurrentAppPath()]);
 }
 
 static NSDictionary *PowerReading(NSDictionary *d) {
@@ -83,6 +98,7 @@ static BOOL BatteryBoundary(NSInteger prior, BOOL wasAC, NSInteger percent, BOOL
 @property NSTimer *resumeTimer;
 @property NSTimer *updateTimer;
 @property BOOL updateRunning;
+@property BOOL startupReadyForExit;
 @property NSTimeInterval resumeAt;
 @end
 
@@ -101,6 +117,7 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
     [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(powerDidWake:) name:NSWorkspaceDidWakeNotification object:nil];
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(modeChanged:) name:@"CodexBarkModeChanged" object:nil];
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(restore:) name:@"CodexBarkRestoreIcon" object:nil];
+    [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(openPanel:) name:@"CodexBarkAppReopen" object:nil];
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(settingsChanged:) name:@"CodexBarkSettingsChanged" object:nil];
     [NSDistributedNotificationCenter.defaultCenter addObserver:self selector:@selector(updatePreferenceChanged:) name:@"CodexBarkUpdatePreferenceChanged" object:nil];
     BOOL hidden = [prefs boolForKey:@"zeroResidentMode"];
@@ -110,17 +127,18 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
     [self reload];
     // A short lived updater recovers interrupted transactions before the readiness receipt.
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSString *recoveryAppPath = CurrentAppPath();
         NSDictionary *recovery = [self runUpdater:@[@"recover"]];
         if ([recovery[@"recovered"] boolValue]) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                NSString *binary = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Contents/MacOS/CodexBarkMenu"];
+                NSString *binary = [recoveryAppPath stringByAppendingPathComponent:@"Contents/MacOS/CodexBarkMenu"];
                 execl(binary.fileSystemRepresentation, binary.fileSystemRepresentation, "--background", NULL);
                 [NSApp terminate:nil];
             });
             return;
         }
         if (![recovery[@"ok"] boolValue]) return;
-        NSString *releasePath = [NSBundle.mainBundle pathForResource:@"release" ofType:@"json"];
+        NSString *releasePath = [CurrentAppPath() stringByAppendingPathComponent:@"Contents/Resources/release.json"];
         NSDictionary *release = [NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:releasePath] options:0 error:nil];
         NSDictionary *receipt = @{@"tag": release[@"tag"] ?: @"", @"pid": @(getpid())};
         NSString *directory = [Support() stringByAppendingPathComponent:@"updates"];
@@ -128,7 +146,22 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
         NSData *data = [NSJSONSerialization dataWithJSONObject:receipt options:0 error:nil];
         [data writeToFile:[directory stringByAppendingPathComponent:@"ready.json"] atomically:YES];
         [NSFileManager.defaultManager setAttributes:@{NSFilePosixPermissions:@0600} ofItemAtPath:[directory stringByAppendingPathComponent:@"ready.json"] error:nil];
-        dispatch_async(dispatch_get_main_queue(), ^{ [self updatePreferenceChanged:nil]; });
+        NSData *transactionData = [NSData dataWithContentsOfFile:[directory stringByAppendingPathComponent:@"transaction.json"]];
+        id transactionObject = transactionData ? [NSJSONSerialization JSONObjectWithData:transactionData options:0 error:nil] : nil;
+        NSDictionary *transaction = [transactionObject isKindOfClass:NSDictionary.class] ? transactionObject : @{};
+        BOOL awaitingUpdate = [transaction[@"phase"] isEqual:@"awaiting_start"];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self updatePreferenceChanged:nil];
+            // The updater requires a live PID for up to twenty seconds. Keep a
+            // zero-resident launch alive only for this bounded startup handoff.
+            // Re-register afterwards so even a version49 worker can commit
+            // before the legacy login entry migrates to the stable launcher.
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (awaitingUpdate ? 25 : 0) * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                RegisterLocation();
+                self.startupReadyForExit = YES;
+                [self finishZeroResidentStartup];
+            });
+        });
     });
     if (!background) [self openPanel:nil];
 
@@ -137,7 +170,7 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
 - (void)powerDidWake:(NSNotification *)notification { self.lastBatteryPercent = -1; [self checkBattery]; [self scheduleUpdateCheck]; }
 - (NSDictionary *)runUpdater:(NSArray *)arguments {
     NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:Python()];
-    task.arguments = [@[@"-I", @"-B", [Support() stringByAppendingPathComponent:@"updater.py"]] arrayByAddingObjectsFromArray:arguments];
+    task.arguments = [[@[@"-I", @"-B", [Support() stringByAppendingPathComponent:@"updater.py"]] arrayByAddingObjectsFromArray:arguments] arrayByAddingObjectsFromArray:@[@"--app", CurrentAppPath()]];
     NSPipe *output = [NSPipe pipe];
     task.standardInput = NSFileHandle.fileHandleWithNullDevice; task.standardOutput = output; task.standardError = NSFileHandle.fileHandleWithNullDevice;
     if (![task launchAndReturnError:nil]) return @{};
@@ -303,7 +336,10 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
     self.status.button.toolTip = [NSString stringWithFormat:@"Bark · %@｜左键菜单，右键开关", self.enabled ? (self.quietNow ? @"每日勿扰中" : @"推送已开启") : @"推送已暂停"];
     [self checkBattery]; [self writeState];
     if (self.menuOpen && changed) { [self buildMenu:self.contextMenu]; [self.contextMenu update]; }
-    if ([NSUserDefaults.standardUserDefaults boolForKey:@"zeroResidentMode"] && !self.batteryEnabled) [NSApp terminate:nil];
+    [self finishZeroResidentStartup];
+}
+- (void)finishZeroResidentStartup {
+    if (self.startupReadyForExit && self.snapshot && [NSUserDefaults.standardUserDefaults boolForKey:@"zeroResidentMode"] && !self.batteryEnabled) [NSApp terminate:nil];
 }
 - (void)resumeReached:(NSTimer *)timer {
     [self reload];
@@ -436,7 +472,8 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
 - (void)openSettings:(id)sender { [self openPanelPage:@"settings"]; }
 - (void)openDevices:(id)sender { [self openPanelPage:@"devices"]; }
 - (void)openPanelPage:(NSString *)page {
-    NSURL *url = [NSBundle.mainBundle.bundleURL URLByAppendingPathComponent:@"Contents/Helpers/Codex Bark Panel.app"];
+    RegisterLocation();
+    NSURL *url = [NSURL fileURLWithPath:[CurrentAppPath() stringByAppendingPathComponent:@"Contents/Helpers/Codex Bark Panel.app"]];
     NSWorkspaceOpenConfiguration *config = NSWorkspaceOpenConfiguration.configuration;
     config.arguments = @[@"--panel-only", [@"--page=" stringByAppendingString:page]]; config.activates = YES;
     [NSWorkspace.sharedWorkspace openApplicationAtURL:url configuration:config completionHandler:^(NSRunningApplication *app, NSError *error) {
@@ -493,16 +530,14 @@ static void PowerChanged(void *context) { [(__bridge MenuApp *)context checkBatt
     });
 }
 - (void)toggleLogin:(id)sender {
-    if ([NSFileManager.defaultManager fileExistsAtPath:LoginFile()]) [NSFileManager.defaultManager removeItemAtPath:LoginFile() error:nil];
-    else {
-        NSDictionary *d = @{@"Label": @"local.codex.bark.menu", @"ProgramArguments": @[@"/usr/bin/open", @"-g", NSBundle.mainBundle.bundlePath, @"--args", @"--background"], @"RunAtLoad": @YES, @"KeepAlive": @NO, @"ProcessType": @"Interactive"};
-        NSData *data = [NSPropertyListSerialization dataWithPropertyList:d format:NSPropertyListXMLFormat_v1_0 options:0 error:nil];
-        [data writeToFile:LoginFile() atomically:YES];
-        [NSFileManager.defaultManager setAttributes:@{NSFilePosixPermissions: @0600} ofItemAtPath:LoginFile() error:nil];
-    }
-    if ([NSUserDefaults.standardUserDefaults boolForKey:@"zeroResidentMode"]) [NSUserDefaults.standardUserDefaults setBool:[NSFileManager.defaultManager fileExistsAtPath:LoginFile()] forKey:@"loginBeforeZero"];
+    BOOL on = ![NSFileManager.defaultManager fileExistsAtPath:LoginFile()];
+    RegisterLocation();
+    NSDictionary *result = Program(@"manage.py", @[@"login-set", on ? @"on" : @"off"]);
+    if (![result[@"ok"] boolValue]) return;
+    if ([NSUserDefaults.standardUserDefaults boolForKey:@"zeroResidentMode"]) [NSUserDefaults.standardUserDefaults setBool:on forKey:@"loginBeforeZero"];
     [NSDistributedNotificationCenter.defaultCenter postNotificationName:@"CodexBarkSettingsChanged" object:nil userInfo:nil deliverImmediately:YES];
 }
+
 - (void)modeChanged:(NSNotification *)notification {
     [NSUserDefaults.standardUserDefaults synchronize];
     if ([NSUserDefaults.standardUserDefaults boolForKey:@"zeroResidentMode"]) {
@@ -535,9 +570,14 @@ int main(int argc, const char *argv[]) {
             NSData *data = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
             puts([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String); return 0;
         }
+        RegisterLocation();
         NSString *lockPath = [Support() stringByAppendingPathComponent:@".menu-instance.lock"];
         int instanceLock = open(lockPath.fileSystemRepresentation, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
-        if (instanceLock < 0 || flock(instanceLock, LOCK_EX | LOCK_NB) != 0) return 0;
+        if (instanceLock < 0 || flock(instanceLock, LOCK_EX | LOCK_NB) != 0) {
+            if (![NSProcessInfo.processInfo.arguments containsObject:@"--background"])
+                [NSDistributedNotificationCenter.defaultCenter postNotificationName:@"CodexBarkAppReopen" object:nil userInfo:nil deliverImmediately:YES];
+            return 0;
+        }
         NSApplication *app = NSApplication.sharedApplication; static MenuApp *delegate; delegate = [MenuApp new]; app.delegate = delegate; [app run]; }
     return 0;
 }

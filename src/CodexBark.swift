@@ -13,12 +13,23 @@ let pythonURL: URL = {
 }()
 let barkScriptCommand = shellQuote(pythonURL.path) + " " + shellQuote(support.appendingPathComponent("bark.py").path)
 let taskWrapperCommand = shellQuote(support.appendingPathComponent("bark-run").path)
-let installedAppURL = URL(fileURLWithPath: "/Applications/Bark.app")
+var installedAppURL: URL {
+    var path = [CChar](repeating: 0, count: 4096)
+    let executable: URL
+    if proc_pidpath(getpid(), &path, UInt32(path.count)) > 0 {
+        executable = URL(fileURLWithPath: String(cString: path))
+    } else { executable = Bundle.main.executableURL! }
+    var bundle = executable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    if bundle.lastPathComponent == "Codex Bark Panel.app" {
+        bundle = bundle.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    }
+    return bundle.resolvingSymlinksInPath()
+}
 
 func backend(_ args: [String], input: Data? = nil, script: String = "bark.py", timeout: Double = 30) -> [String: Any] {
     let p = Process()
     p.executableURL = pythonURL
-    p.arguments = [support.appendingPathComponent(script).path] + args
+    p.arguments = [support.appendingPathComponent(script).path] + args + (script == "updater.py" ? ["--app", installedAppURL.path] : [])
     let out = Pipe()
     p.standardOutput = out
     p.standardError = FileHandle.nullDevice
@@ -267,6 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             }
             NSApp.terminate(nil); return
         }
+        _ = backend(["app-register", "--app", installedAppURL.path], script: "manage.py")
         NSApp.setActivationPolicy(panelOnly ? .regular : .accessory)
         if let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleIconFile") as? String, let url = Bundle.main.url(forResource: name, withExtension: "icns"), let icon = NSImage(contentsOf: url) { NSApp.applicationIconImage = icon }
         installMainMenu()
@@ -1599,18 +1611,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func setLogin(_ on: Bool) throws {
-        if on {
-            let installed = installedAppURL
-            let app = FileManager.default.fileExists(atPath: installed.path) ? installed : Bundle.main.bundleURL
-            let plist: [String: Any] = ["Label": "local.codex.bark.menu", "ProgramArguments": ["/usr/bin/open", "-g", app.path, "--args", "--background"],
-                                        "RunAtLoad": true, "KeepAlive": false, "ProcessType": "Interactive"]
-            try FileManager.default.createDirectory(at: loginFile.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
-            try data.write(to: loginFile, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: loginFile.path)
-        } else if FileManager.default.fileExists(atPath: loginFile.path) {
-            try FileManager.default.removeItem(at: loginFile)
-        }
+        let registration = backend(["app-register", "--app", installedAppURL.path], script: "manage.py")
+        guard registration["ok"] as? Bool == true else { throw CocoaError(.fileNoSuchFile) }
+        let result = backend(["login-set", on ? "on" : "off"], script: "manage.py")
+        guard result["ok"] as? Bool == true else { throw CocoaError(.fileWriteUnknown) }
     }
 
     @objc func toggleLogin() {

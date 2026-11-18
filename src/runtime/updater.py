@@ -9,6 +9,7 @@ import contextlib
 import ctypes
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -197,9 +198,40 @@ def process_path(pid):
     except (subprocess.SubprocessError, ValueError): return ''
 
 
+def location_manager(base):
+    # The isolated worker is copied under updates/, so importing a sibling by
+    # module name would either fail or use the wrong installation's manager.
+    path = Path(base) / 'manage.py'
+    require(path.is_file() and not path.is_symlink(), 'app_location_error')
+    spec = importlib.util.spec_from_file_location('_bark_update_location', path)
+    require(spec is not None and spec.loader is not None, 'app_location_error')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def resolve_app(base):
+    try:
+        return location_manager(base).resolve_app(base=base)
+    except UpdateError:
+        raise
+    except Exception:
+        raise UpdateError('app_location_error') from None
+
+
+def register_app(app, base):
+    try:
+        # Launch-at-login is a user preference; location refresh changes neither
+        # that preference nor the stable launcher already installed by manage.
+        location_manager(base).register_app(app, base=base, migrate_login=False)
+    except UpdateError:
+        raise
+    except Exception:
+        raise UpdateError('app_location_error') from None
+
+
 class Updater:
     def __init__(self, app=None, base=None):
-        self.app = Path(app or '/Applications/Bark.app')
         self.base = Path(base or Path.home() / 'Library/Application Support/CodexBark')
         self.root = self.base / 'updates'
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -209,6 +241,73 @@ class Updater:
         self.prefs_path = self.root / 'preferences.json'
         self.transaction_path = self.root / 'transaction.json'
         self.arch = platform.machine()
+        self.explicit_app = app is not None
+        self.app = self.app_destination(app if app is not None else resolve_app(self.base))
+        txn = read_json(self.transaction_path)
+        if txn.get('phase') in ('applying', 'awaiting_start'):
+            # A current process may supply its own bundle, but cannot redirect
+            # an interrupted transaction to a different installation.
+            require(self.transaction_app(txn) == self.app, 'app_location_error')
+
+    def app_destination(self, value):
+        require(isinstance(value, (str, Path)), 'unsafe_destination')
+        path = Path(value)
+        require(path.is_absolute() and str(path) == os.path.normpath(str(path)), 'unsafe_destination')
+        require(path.suffix.lower() == '.app' and not path.name.startswith('.Bark-update-'), 'unsafe_destination')
+        require(not path.is_symlink(), 'unsafe_destination')
+        # macOS exposes the same real directory through /var and /private/var.
+        # Pin the canonical parent once, while still rejecting a symlink bundle.
+        path = path.resolve()
+        base = self.base.resolve()
+        require(base != path and base not in path.parents and path not in base.parents, 'unsafe_destination')
+        return path
+
+    def transaction_app(self, txn):
+        require(isinstance(txn, dict), 'local_state_error')
+        identifier = txn.get('id')
+        require(isinstance(identifier, str) and re.fullmatch('backup-[0-9a-f]{32}', identifier) is not None, 'local_state_error')
+        present = txn.get('runtime_present')
+        require(isinstance(present, list) and all(isinstance(name, str) and name in RUNTIME for name in present)
+                and len(present) == len(set(present)), 'local_state_error')
+        if 'app_path' not in txn:
+            return self.legacy_transaction_app()
+        require(isinstance(txn['app_path'], str), 'local_state_error')
+        try:
+            return self.app_destination(txn['app_path'])
+        except UpdateError:
+            raise UpdateError('local_state_error') from None
+
+    def legacy_transaction_app(self):
+        # Version 49 transactions predate destination pinning. Only a current
+        # native process explicitly identifying the historical installation may
+        # recover them; a missing bookmark never grants a new fallback target.
+        require(self.explicit_app, 'local_state_error')
+        def metadata(path):
+            if not path.exists() and not path.is_symlink(): return None
+            info = path.lstat()
+            require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                    and not stat.S_IMODE(info.st_mode) & 0o022, 'local_state_error')
+            value = read_json(path)
+            require(isinstance(value, dict), 'local_state_error')
+            return value
+        manifest = metadata(self.base / 'installation.json')
+        gui = manifest.get('menu_app') if manifest else None
+        known = self.app == Path('/Applications/Bark.app').resolve()
+        if isinstance(gui, dict) and isinstance(gui.get('path'), str):
+            known = self.app_destination(gui['path']) == self.app
+        require(known, 'local_state_error')
+        record = metadata(self.base / 'app-location.json')
+        if record is not None:
+            require(record.get('schema') == 1 and record.get('bundle_id') == 'local.codex.bark.menu'
+                    and isinstance(record.get('path'), str)
+                    and self.app_destination(record['path']) == self.app, 'local_state_error')
+        return self.app
+
+    def refresh_location(self, strict=True):
+        try:
+            register_app(self.app, self.base)
+        except Exception:
+            if strict: raise UpdateError('app_location_error') from None
 
     @contextlib.contextmanager
     def lock(self):
@@ -362,7 +461,8 @@ class Updater:
             require(self.status().get('status') == 'ready', 'check_required')
             require(not self.transaction_path.exists() or read_json(self.transaction_path).get('phase') in ('complete', 'rolled_back'), 'recovery_required')
             atomic(self.root / 'worker.py', Path(__file__).read_bytes(), 0o700)
-            subprocess.Popen([sys.executable, '-I', '-B', str(self.root / 'worker.py'), 'apply', '--parent-pid', str(parent_pid)],
+            subprocess.Popen([sys.executable, '-I', '-B', str(self.root / 'worker.py'), 'apply',
+                              '--app', str(self.app), '--base', str(self.base), '--parent-pid', str(parent_pid)],
                              start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
         return {'ok': True, 'started': True}
 
@@ -380,14 +480,24 @@ class Updater:
 
     def restore(self, txn):
         # Transaction paths are generated locally, never supplied by the release.
+        destination = self.transaction_app(txn)
+        require(destination == self.app, 'app_location_error')
         backup = self.root / txn['id']
-        require(re.fullmatch('backup-[0-9a-f]{32}', txn.get('id', '')) is not None, 'local_state_error')
-        sibling = self.app.with_name('.Bark-update-' + txn['id'] + '.app')
-        require(not self.app.is_symlink() and not sibling.is_symlink(), 'unsafe_destination')
+        sibling = destination.with_name('.Bark-update-' + txn['id'] + '.app')
+        require(backup.is_dir() and not backup.is_symlink() and (backup / 'Bark.app').is_dir()
+                and not (backup / 'Bark.app').is_symlink() and (backup / 'runtime').is_dir()
+                and not (backup / 'runtime').is_symlink(), 'local_state_error')
+        require(not destination.is_symlink() and not sibling.is_symlink(), 'unsafe_destination')
+        for name in txn['runtime_present']:
+            source = backup / 'runtime' / name
+            require(source.is_file() and not source.is_symlink(), 'local_state_error')
+        if 'app_path' not in txn:
+            txn = dict(txn, app_path=str(destination))
+            write_json(self.transaction_path, txn)
         if (backup / 'Bark.app').is_dir():
             if sibling.exists(): shutil.rmtree(sibling)
             shutil.copytree(backup / 'Bark.app', sibling)
-            swap_directories(self.app, sibling)
+            swap_directories(destination, sibling)
             shutil.rmtree(sibling)
         for name in RUNTIME:
             source = backup / 'runtime' / name
@@ -400,6 +510,9 @@ class Updater:
         state = read_json(self.state_path)
         state.update(status='available', error='update_rolled_back')
         write_json(self.state_path, state)
+        # Restore the app and programs first. A broken bookmark must never
+        # interrupt rollback or prevent the caller from restarting the old app.
+        self.refresh_location(strict=False)
 
     def recover(self):
         recovered = False
@@ -438,6 +551,7 @@ class Updater:
             require(process_path(parent_pid) != expected, 'panel_still_open')
         with self.lock():
             state = read_json(self.state_path)
+            require(not self.transaction_path.exists() or read_json(self.transaction_path).get('phase') in ('complete', 'rolled_back'), 'recovery_required')
             require(state.get('status') == 'ready', 'check_required')
             stage = self.root / 'stage'
             manifest = self.signed_manifest(stage, state['tag'])
@@ -445,7 +559,8 @@ class Updater:
             require(self.arch == manifest['arch'], 'incompatible_update')
             self.validate_payload(stage / 'payload', manifest)
             require(self.app.is_dir() and not self.app.is_symlink() and os.access(self.app.parent, os.W_OK), 'install_permission')
-            txn = {'id': 'backup-' + uuid.uuid4().hex, 'phase': 'preparing', 'tag': state['tag']}
+            txn = {'id': 'backup-' + uuid.uuid4().hex, 'phase': 'preparing', 'tag': state['tag'],
+                   'app_path': str(self.app)}
             backup = self.root / txn['id']; backup.mkdir(mode=0o700)
             txn['runtime_present'] = self.backup_runtime(backup / 'runtime')
             shutil.copytree(self.app, backup / 'Bark.app')
@@ -462,6 +577,7 @@ class Updater:
                     atomic(self.base / name, (stage / 'payload/runtime' / name).read_bytes(), 0o700)
                     if fault: fault('runtime:' + name)
                 require(self.installed()['tag'] == manifest['tag'], 'app_health_failed')
+                self.refresh_location()
                 txn['phase'] = 'awaiting_start'
                 write_json(self.transaction_path, txn)
                 if restart:
@@ -493,9 +609,11 @@ def main():
     parser.add_argument('--due', action='store_true')
     parser.add_argument('--download', action='store_true')
     parser.add_argument('--parent-pid', type=int, default=0)
+    parser.add_argument('--app')
+    parser.add_argument('--base', help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
-        updater = Updater()
+        updater = Updater(app=args.app, base=args.base)
         if args.action == 'status': result = updater.status()
         elif args.action == 'automatic':
             require(args.value in ('on', 'off'), 'invalid_request')

@@ -29,9 +29,14 @@ class UpdaterTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.app = self.root/'Bark.app'; app_fixture(self.app)
         self.base = self.root/'runtime'; self.base.mkdir()
+        # Fixtures are deliberately unsigned bundles. Native location validation
+        # is covered separately; keep these tests focused on the transaction.
+        registration = patch.object(u, 'register_app')
+        self.addCleanup(registration.stop)
+        registration.start()
         self.up = u.Updater(self.app,self.base)
 
     def stage(self):

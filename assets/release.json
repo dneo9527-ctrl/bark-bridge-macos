@@ -1,6 +1,6 @@
 {
-  "version": "2.6.1",
-  "build": 49,
-  "tag": "v2.6.1",
-  "channel": "stable"
+  "version": "2.6.2",
+  "build": 50,
+  "tag": "v2.6.2-preview.1",
+  "channel": "preview"
 }

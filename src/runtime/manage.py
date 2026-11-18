@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 """Attach/uninstall this user's shared notifier. Never accesses account auth stores."""
 import argparse
+import base64
+import ctypes
 import datetime
 import json
 import os
@@ -87,6 +89,279 @@ LOGIN_FILE = Path.home() / "Library/LaunchAgents/local.codex.bark.menu.plist"
 APP_PATH = Path("/Applications/Bark.app")
 REQUIRED_HOOK_EVENTS = ("preToolUse", "permissionRequest", "sessionStart", "stop")
 MAX_HEALTH_HOMES = 16
+APP_IDENTIFIER = "local.codex.bark.menu"
+UPDATE_PUBLIC_KEY = "z1ADse6t11ZmEymVZflP7r9fk2z3vb8rUOTNN+fZaNo="
+
+
+def _runtime_base(base=None):
+    return Path(BASE if base is None else base).resolve()
+
+
+def _public_json(path):
+    """Read only our bounded public installation/location/update metadata."""
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("app_location_invalid")
+    info = path.stat()
+    if info.st_uid != os.getuid() or info.st_size > 262144 or stat.S_IMODE(info.st_mode) & 0o022:
+        raise RuntimeError("app_location_invalid")
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict):
+        raise RuntimeError("app_location_invalid")
+    return data
+
+
+def _validate_app(app, base=None):
+    """Validate one selected bundle, never search for another installation."""
+    app = Path(app)
+    if not app.is_absolute() or app.is_symlink() or not app.is_dir():
+        raise RuntimeError("app_location_unavailable")
+    app = app.resolve()
+    if (app.suffix.lower() != ".app" or any(part.lower().startswith(".bark-update-") for part in app.parts)
+            or any(part.lower() in (".trash", ".trashes") for part in app.parts)):
+        raise RuntimeError("app_location_invalid")
+    if app.is_relative_to(_runtime_base(base) / "updates"):
+        raise RuntimeError("app_location_invalid")
+
+    def resource(relative, executable=False):
+        path = app / relative
+        if (path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(app)
+                or (executable and not os.access(path, os.X_OK))):
+            raise RuntimeError("app_location_invalid")
+        return path
+
+    for prefix, identifier, executable in [
+        ("Contents", APP_IDENTIFIER, "CodexBarkMenu"),
+        ("Contents/Helpers/Codex Bark Panel.app/Contents", "local.codex.bark.panel", "CodexBarkPanel"),
+    ]:
+        info = plistlib.loads(resource(prefix + "/Info.plist").read_bytes())
+        if (info.get("CFBundleIdentifier") != identifier or info.get("CFBundleExecutable") != executable
+                or info.get("CFBundlePackageType") != "APPL"):
+            raise RuntimeError("app_location_invalid")
+        resource(prefix + "/MacOS/" + executable, executable=True)
+    resource("Contents/Helpers/BarkUpdateVerifier", executable=True)
+    release = json.loads(resource("Contents/Resources/release.json").read_text())
+    if not isinstance(release, dict) or release.get("update_protocol") != 1:
+        raise RuntimeError("app_location_invalid")
+    if resource("Contents/Resources/update-public-key.txt").read_text().strip() != UPDATE_PUBLIC_KEY:
+        raise RuntimeError("app_location_invalid")
+    return app
+
+
+def _core_foundation():
+    if sys.platform != "darwin":
+        raise RuntimeError("app_bookmark_unavailable")
+    cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+    pointer = ctypes.c_void_p
+    signatures = {
+        "CFURLCreateFromFileSystemRepresentation": ([pointer, pointer, ctypes.c_long, ctypes.c_ubyte], pointer),
+        "CFURLCreateBookmarkData": ([pointer, pointer, ctypes.c_ulong, pointer, pointer, pointer], pointer),
+        "CFDataCreate": ([pointer, pointer, ctypes.c_long], pointer),
+        "CFDataGetLength": ([pointer], ctypes.c_long),
+        "CFDataGetBytePtr": ([pointer], pointer),
+        "CFURLCreateByResolvingBookmarkData":
+            ([pointer, pointer, ctypes.c_ulong, pointer, pointer, pointer, pointer], pointer),
+        "CFURLGetFileSystemRepresentation": ([pointer, ctypes.c_ubyte, pointer, ctypes.c_long], ctypes.c_ubyte),
+        "CFRelease": ([pointer], None),
+    }
+    for name, (arguments, result) in signatures.items():
+        function = getattr(cf, name)
+        function.argtypes, function.restype = arguments, result
+    return cf
+
+
+def _create_app_bookmark(app):
+    cf = _core_foundation()
+    encoded = os.fsencode(app)
+    url = cf.CFURLCreateFromFileSystemRepresentation(None, encoded, len(encoded), True)
+    if not url:
+        raise RuntimeError("app_bookmark_unavailable")
+    bookmark = None
+    try:
+        # Normal bookmarks need no sandbox entitlement or additional permission.
+        bookmark = cf.CFURLCreateBookmarkData(None, url, 0, None, None, None)
+        if not bookmark:
+            raise RuntimeError("app_bookmark_unavailable")
+        return base64.b64encode(ctypes.string_at(cf.CFDataGetBytePtr(bookmark),
+                                                cf.CFDataGetLength(bookmark))).decode("ascii")
+    finally:
+        if bookmark:
+            cf.CFRelease(bookmark)
+        cf.CFRelease(url)
+
+
+def _resolve_app_bookmark(record):
+    try:
+        encoded = record["bookmark"]
+        if not isinstance(encoded, str) or len(encoded) > 131072:
+            raise ValueError()
+        value = base64.b64decode(encoded, validate=True)
+        if not value:
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        raise RuntimeError("app_location_invalid") from None
+    cf = _core_foundation()
+    data = cf.CFDataCreate(None, value, len(value))
+    url = None
+    try:
+        stale = ctypes.c_ubyte()
+        # kCFURLBookmarkResolutionWithoutUI | WithoutMounting: never prompt or mount.
+        url = cf.CFURLCreateByResolvingBookmarkData(None, data, (1 << 8) | (1 << 9), None, None,
+                                                   ctypes.byref(stale), None)
+        if not url:
+            raise RuntimeError("app_location_unavailable")
+        buffer = ctypes.create_string_buffer(32768)
+        if not cf.CFURLGetFileSystemRepresentation(url, True, buffer, len(buffer)):
+            raise RuntimeError("app_location_unavailable")
+        return Path(os.fsdecode(buffer.value)), bool(stale.value)
+    finally:
+        if url:
+            cf.CFRelease(url)
+        if data:
+            cf.CFRelease(data)
+
+
+def _location_record(base=None):
+    path = _runtime_base(base) / "app-location.json"
+    if not path.exists() and not path.is_symlink():
+        return None
+    record = _public_json(path)
+    if (record.get("schema") != 1 or record.get("bundle_id") != APP_IDENTIFIER
+            or not isinstance(record.get("path"), str) or not Path(record["path"]).is_absolute()):
+        raise RuntimeError("app_location_invalid")
+    return record
+
+
+def _pending_app(base=None, record=None):
+    path = _runtime_base(base) / "updates/transaction.json"
+    if not path.exists() and not path.is_symlink():
+        return None
+    transaction = _public_json(path)
+    if transaction.get("phase") not in ("applying", "awaiting_start"):
+        return None
+    target = transaction.get("app_path")
+    # Protocol-1 transactions from older versions did not store the destination.
+    if target is None:
+        manifest = _public_json(_runtime_base(base) / "installation.json")
+        menu_app = manifest.get("menu_app")
+        present = transaction.get("runtime_present")
+        if (not isinstance(menu_app, dict) or not isinstance(present, list)
+                or len(set(present)) != len(present)
+                or any(name not in ("bark.py", "manage.py", "claude_bark.py", "bark-run", "updater.py")
+                       for name in present)):
+            raise RuntimeError("app_location_invalid")
+        target = menu_app.get("path")
+    if (not isinstance(target, str) or not Path(target).is_absolute()
+            or not re.fullmatch(r"backup-[0-9a-f]{32}", transaction.get("id", ""))):
+        raise RuntimeError("app_location_invalid")
+    app = _validate_app(target, base)
+    if record is not None and Path(record["path"]).resolve() != app:
+        bookmarked, _ = _resolve_app_bookmark(record)
+        # RENAME_SWAP makes the old app's bookmark follow the generated sibling.
+        sibling = app.with_name(".Bark-update-" + transaction["id"] + ".app")
+        if bookmarked.resolve() not in (app, sibling):
+            raise RuntimeError("app_location_invalid")
+    return app
+
+
+def resolve_app(base=None):
+    """Resolve the selected installation without touching preferences or secrets."""
+    record = _location_record(base)
+    pending = _pending_app(base, record)
+    if pending is not None:
+        return pending
+    if record is None:
+        return _validate_app(APP_PATH, base)
+    app, _ = _resolve_app_bookmark(record)
+    return _validate_app(app, base)
+
+
+def login_arguments(base=None):
+    root = _runtime_base(base)
+    bundled = root / "python/bin/python3"
+    python = str(bundled) if bundled.is_file() else "/usr/bin/python3"
+    return [python, "-I", "-B", str(root / "manage.py"), "launch-app"]
+
+
+def _write_login(on, base=None, only_existing=False):
+    existing = None
+    if LOGIN_FILE.is_symlink():
+        raise RuntimeError("invalid_login_item")
+    if LOGIN_FILE.exists():
+        existing = plistlib.loads(LOGIN_FILE.read_bytes())
+        if not isinstance(existing, dict) or existing.get("Label") != APP_IDENTIFIER:
+            raise RuntimeError("invalid_login_item")
+    if not on:
+        if existing is not None:
+            LOGIN_FILE.unlink()
+        return
+    if only_existing and (existing is None or existing.get("RunAtLoad") is not True):
+        return
+    wanted = dict(existing or {})
+    wanted.update(Label=APP_IDENTIFIER, ProgramArguments=login_arguments(base), RunAtLoad=True)
+    wanted.setdefault("KeepAlive", False)
+    wanted.setdefault("ProcessType", "Interactive")
+    if existing != wanted:
+        atomic(LOGIN_FILE, plistlib.dumps(wanted).decode("utf-8"))
+
+
+def register_app(app, base=None, migrate_login=True):
+    """Remember an explicitly launched installation, preserving every user setting."""
+    root = _runtime_base(base)
+    if not root.is_dir() or root.is_symlink() or root.stat().st_uid != os.getuid():
+        raise RuntimeError("app_location_invalid")
+    app = _validate_app(app, root)
+    previous = _location_record(root)
+    pending = _pending_app(root, previous)
+    if pending is not None and pending != app:
+        raise RuntimeError("app_location_busy")
+    info = app.stat()
+    identity = {"device": info.st_dev, "inode": info.st_ino}
+    unchanged = (previous is not None and previous.get("path") == str(app)
+                 and previous.get("identity") == identity)
+    if unchanged:
+        try:
+            resolved, stale = _resolve_app_bookmark(previous)
+            unchanged = resolved.resolve() == app and not stale
+        except Exception:
+            unchanged = False
+    manifest_path = root / "installation.json"
+    manifest = _public_json(manifest_path) if manifest_path.exists() or manifest_path.is_symlink() else None
+    if not unchanged:
+        record = {"schema": 1, "bundle_id": APP_IDENTIFIER, "path": str(app), "identity": identity,
+                  "bookmark": _create_app_bookmark(app)}
+        atomic(root / "app-location.json", json.dumps(record, sort_keys=True) + "\n")
+    if manifest is not None and isinstance(manifest.get("menu_app"), dict):
+        if manifest["menu_app"].get("path") != str(app):
+            manifest["menu_app"]["path"] = str(app)
+            atomic(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    # A version-49 worker can still roll back to a manager without launch-app.
+    # Keep its old login entry until the replacement has committed; the native
+    # startup handoff registers again once the transaction is terminal.
+    if migrate_login and pending is None:
+        _write_login(True, root, only_existing=True)
+    return app
+
+
+def set_login(on, base=None):
+    if on:
+        register_app(resolve_app(base), base, migrate_login=False)
+    _write_login(bool(on), base)
+
+
+def launch_app(base=None):
+    app = resolve_app(base)
+    register_app(app, base)
+    subprocess.run(["/usr/bin/open", "-g", str(app), "--args", "--background"], check=True, timeout=10,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return app
+
+
+def _app_for_status():
+    # Historical installations have no location record; retain their read-only
+    # diagnostics behavior until their first native launch registers the app.
+    if _location_record() is None and _pending_app() is None:
+        return APP_PATH
+    return resolve_app()
 
 
 def hooks_list(home, timeout=15):
@@ -182,13 +457,16 @@ def _check_login_item(login_path, app_path):
             return _item("login_item", "登录启动项", "warning", "invalid_login_item", "登录启动项文件异常，可在设置中重新切换。")
         plist = plistlib.loads(login_path.read_bytes())
         args = plist.get("ProgramArguments") if isinstance(plist, dict) else None
+        allowed = [login_arguments()]
+        if _location_record() is None:
+            allowed.append(["/usr/bin/open", "-g", str(app_path), "--args", "--background"])
         if (
             not isinstance(plist, dict)
             or plist.get("Label") != "local.codex.bark.menu"
             or not isinstance(args, list)
-            or args != ["/usr/bin/open", "-g", str(app_path), "--args", "--background"]
+            or args not in allowed
             or plist.get("RunAtLoad") is not True
-            or not app_path.is_dir()
+            or app_path is None or not app_path.is_dir()
         ):
             return _item("login_item", "登录启动项", "warning", "invalid_login_item", "登录启动项指向异常，可在设置中重新切换。")
         return _item("login_item", "登录启动项", "pass", "ok", "登录启动项配置正常。")
@@ -302,7 +580,11 @@ def health_report(budget_seconds=20.0, per_home_timeout=4.0):
             checks.append(_item(f"home_{idx}_hooks", f"{label} · Hook 状态", h_status, h_code, h_detail))
 
     # 4. 登录启动项（关闭属于正常偏好，status="off" 不触发全局失败）
-    checks.append(_check_login_item(LOGIN_FILE, APP_PATH))
+    try:
+        installed_app = _app_for_status()
+    except Exception:
+        installed_app = None
+    checks.append(_check_login_item(LOGIN_FILE, installed_app))
 
     statuses = {c["status"] for c in checks}
     if "warning" in statuses:
@@ -364,7 +646,7 @@ def support_report(snapshot_provider=None, health_provider=None):
                                      for i, x in enumerate(devices[:16]) if isinstance(x, dict)]})
     version = "unknown"
     try:
-        value = plistlib.loads((APP_PATH / "Contents/Info.plist").read_bytes()).get("CFBundleShortVersionString")
+        value = plistlib.loads((_app_for_status() / "Contents/Info.plist").read_bytes()).get("CFBundleShortVersionString")
         if isinstance(value, str) and re.fullmatch(r"[0-9]{1,4}(?:\.[0-9]{1,4}){1,3}", value): version = value
     except Exception: pass
     status = snap.get("status", {})
@@ -534,6 +816,13 @@ def uninstall():
             print("Claude Code 通知入口未能移除，已停止卸载，请检查其本地配置后重试。")
             return
     m = load_manifest()
+    app_to_remove = None
+    if m.get("menu_app"):
+        try:
+            app_to_remove = resolve_app()
+        except Exception:
+            print("应用位置暂不可用，已停止卸载，请先手动打开 Bark 后重试。")
+            return
     for name, item in m["homes"].items():
         home = Path(name)
         p = home / "hooks.json"
@@ -565,7 +854,7 @@ def uninstall():
     gui = m.get("menu_app")
     if gui:
         import plistlib
-        app = Path(gui["path"])
+        app = app_to_remove
         login = Path(gui["login_plist"])
         if login.exists():
             try:
@@ -580,6 +869,7 @@ def uninstall():
         info = app / "Contents/Info.plist"
         if info.exists() and plistlib.loads(info.read_bytes()).get("CFBundleIdentifier") == "local.codex.bark.menu":
             shutil.rmtree(app)
+            (BASE / "app-location.json").unlink(missing_ok=True)
     (BASE / ".menu-instance.lock").unlink(missing_ok=True)
     m["uninstalled"] = True
     save_manifest(m)
@@ -589,11 +879,33 @@ def uninstall():
 def main():
     os.umask(0o077)
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["attach", "check", "uninstall", "health", "support-report"])
+    p.add_argument("action", choices=["attach", "check", "uninstall", "health", "support-report",
+                                     "app-register", "app-locate", "launch-app", "login-set"])
     p.add_argument("home", nargs="?", default=str(Path.home() / ".codex"))
+    p.add_argument("--app", type=Path)
     p.add_argument("--with-cc-switch", action="store_true", help="Explicitly merge Bark Hook trust into CC Switch common config")
     a = p.parse_args()
-    if a.action == "support-report":
+    if a.action in ("app-register", "app-locate", "launch-app", "login-set"):
+        try:
+            if a.action == "app-register":
+                if a.app is None:
+                    raise RuntimeError("app_location_invalid")
+                result = {"ok": True, "path": str(register_app(a.app))}
+            elif a.action == "app-locate":
+                result = {"ok": True, "path": str(resolve_app())}
+            elif a.action == "launch-app":
+                result = {"ok": True, "path": str(launch_app())}
+            else:
+                if a.home not in ("on", "off"):
+                    raise RuntimeError("invalid_login_item")
+                set_login(a.home == "on")
+                result = {"ok": True}
+        except Exception:
+            result = {"ok": False, "error": "app_location_unavailable"}
+        print(json.dumps(result, ensure_ascii=False))
+        if not result["ok"]:
+            raise SystemExit(1)
+    elif a.action == "support-report":
         try: result = support_report()
         except Exception: result = {"ok": False, "error": "report_unavailable"}
         print(json.dumps(result, ensure_ascii=False))

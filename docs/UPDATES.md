@@ -21,7 +21,7 @@
 
 ## 保留与回退
 
-更新协议 1 只替换 `/Applications/Bark.app` 和共享目录中的 `bark.py`、`manage.py`、`claude_bark.py`、`bark-run`、`updater.py`。设备、规则、来源、历史、Hook/Skill 入口、Codex 账号目录与授权策略不在更新包范围内。Python 解释器不在协议 1 更新范围内，后续需要升级解释器时应另设计兼容迁移。
+更新协议 1 只替换当前安装的 Bark App 和共享目录中的 `bark.py`、`manage.py`、`claude_bark.py`、`bark-run`、`updater.py`。首次安装默认位置是 `/Applications/Bark.app`；2.6.2 开发候选会记住移动后的实际 App，详见[移动说明](RELOCATION.md)。设备、规则、来源、历史、Hook/Skill 入口、Codex 账号目录与授权策略不在更新包范围内。Python 解释器不在协议 1 更新范围内，后续需要升级解释器时应另设计兼容迁移。
 
 后台任务与推送路径独立。运行时文件通过原子替换更新，已加载的发送进程可以继续；不会停止 Codex，也不会强杀正在发送的进程。
 

@@ -1,56 +1,39 @@
 {
-  "version": "2.6.1",
-  "build": 49,
-  "tag": "v2.6.1",
-  "channel": "stable",
-  "distribution": "GitHub candidate; Apple Silicon first-install and Ed25519 program-update archives",
+  "version": "2.6.2",
+  "build": 50,
+  "tag": "v2.6.2-preview.1",
+  "channel": "preview",
   "license": "MIT",
-  "verification_status": "local_tests_and_phone_confirmed_publication_pending",
+  "verification_status": "local_build50_installed_and_relocation_verified",
   "signature": "ad-hoc; not Developer ID or notarized",
-  "python_test_executions_per_interpreter": 290,
-  "python_test_passed_per_interpreter": 289,
+  "base_public_main": "b36f24ce4a4f2f936a123153f8cce1836dd90c5a",
+  "python_test_executions_per_interpreter": 322,
+  "python_test_passed_per_interpreter": 321,
   "python_test_skipped_per_interpreter": 1,
-  "interpreters": [
-    "system Python3.9.6",
-    "bundled Python3.13.18"
-  ],
-  "skip_reason": "Optional real Codex CLI test; no Hook or Skill implementation changes in this patch.",
-  "native_build": "AppleSilicon passed",
-  "base_public_main": "7f207d2b75b87e8f2dd678f6a045b07d2cfa69cc",
-  "codex_notification_icon": {
-    "source_aware": true,
-    "ios_minimum": 15,
-    "asset_kind": "genuine Codex app artwork; OpenAI rights excluded from project MIT",
-    "immutable_public_asset": true,
-    "phone_rendering": "user_confirmed_2026-11-17_single_device",
-    "mac_image_fetches_added": 0,
-    "new_regression_tests": 7,
-    "http": 200,
-    "bytes": 493468,
-    "dimensions": [
-      1024,
-      1024
-    ],
-    "sha256": "de7d43f3386105ab20952958c2c25beb0d903e2aeb6e1aef57c49a648c0d1c07",
-    "matches_repository_artwork": true
-  },
+  "skip_reason": "Optional real Codex CLI test; Hook behavior unchanged.",
+  "native_build": "Apple Silicon passed",
   "new_daemons": 0,
   "installed_config_read": false,
-  "live_installation_modified": true,
-  "prior_evidence": "Build48 candidate superseded; Build47 public evidence remains attributed to2.6.0.",
-  "publication": "Pending publishing-chat handoff. Exact source SHA, CI, signed artifacts and download receipts must be recorded by the publisher.",
+  "publication": "Local candidate; no new public release",
+  "relocation": {
+    "bookmark": "ordinary macOS CFURL bookmark",
+    "launcher": "stable manage.py launch-app",
+    "runtime_scripts": 5,
+    "actual_app_bookmark_swap_rollback": "passed isolated real App/CFURL, signature boundary mocked; restartFalse",
+    "native_handoff": "passed isolated ordinary/no-transaction and awaiting_start, synthetic backends",
+    "live_installation": "49to50 signed update passed; running move + closed rename + stable launcher + panel verified; actual logout untested"
+  },
   "unverified": [
-    "physical iPhone image-unavailable fallback and other phone/network combinations",
-    "new candidate public CI and anonymous release download",
-    "fresh physical Mac quarantine first-open",
+    "real logout/login after relocation",
+    "cross-volume copy/delete and unavailable volumes",
+    "new public CI and release download",
+    "fresh Mac quarantine first-open",
     "Developer ID and notarization",
     "Intel and macOS13 physical device",
     "long-term idle battery impact"
   ],
-  "codex_phone_archive": {
-    "codex": "1",
-    "other_sources_and_legacy": "0",
-    "phone_history": "user confirmed corrected source-test before local deployment"
-  },
-  "native_restart": "passed local46to49; exact readinessPID and five runtime files match"
+  "interpreters": [
+    "system Python3.9.6",
+    "distribution Python3.13.18"
+  ]
 }
