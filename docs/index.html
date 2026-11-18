@@ -79,6 +79,13 @@ footer p{margin:6px 0}
   这是 GitHub 正式分发，未上架 App Store。当前采用 ad-hoc 签名，尚未使用 Developer ID 签名或 Apple 公证，首次打开可能被 macOS 拦截。请核对来源并参考 <a href="https://support.apple.com/102445">Apple 安全打开说明</a>，不移除隔离标记、不关闭 Gatekeeper；Ed25519 更新签名不等于 Apple 公证。插图和视频均为功能示意。
 </div>
 
+<section class="card" aria-label="2.6.2 预览版">
+  <h2 style="margin:0 0 10px;padding:0">2.6.2 preview.2 · Build 51</h2>
+  <p>预览实际 App 同卷移动或改名后的设置、登录入口和程序更新跟随，以及兼容 Agy Console 的完成／最终失败提醒。稳定版仍为上方 2.6.1。</p>
+  <p style="margin-top:10px"><a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.2-preview.2">预览 Release 与校验文件</a> · <a href="https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.2-preview.2/Bark-Bridge-2.6.2-macOS-arm64-preview.zip">预览首次安装包</a> · <a href="AGY.html">Agy 配套条件</a> · <a href="RELOCATION.html">App 移动说明</a></p>
+  <p style="margin-top:10px">Agy 通知还需要控制台侧兼容生产者；旧公开 Agy .8、独立 CLI 和 IDE 不会因安装 Bark 自动接入。合成网关测试已过，手机实收和真实新任务待确认。稳定客户端不自动发现预览；首装助手拒绝覆盖已有安装，已有用户需按维护指导进入预览并使用签名更新。</p>
+</section>
+
 <figure class="hero-img">
   <img src="media/overview.svg" alt="提醒示意：示例聊天等待授权、等待回答和本轮完成。手机查看提醒，Mac 回答与审批；非实机截图。" width="1320">
   <figcaption>手机负责显示提醒，实际回答和审批仍在 Mac 上完成。Bark Bridge 不改变操作授权策略，也不自动批准请求。</figcaption>

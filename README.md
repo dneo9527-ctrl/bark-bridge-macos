@@ -18,6 +18,16 @@
 
 > **已封装为原生 macOS `.app`。** 安装后有菜单栏铃铛和独立设置窗口；Apple Silicon 安装 ZIP 内含图形安装助手及 Python 3.13.18，普通用户不用终端、Xcode 或自行装 Python。当前是 GitHub 2.6.1 正式分发，未上架 App Store，未使用 Developer ID 签名或 Apple 公证。插图和视频均为功能示意。
 
+## 2.6.2 preview.2 · Build 51
+
+**[预览版 Release](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.2-preview.2)** · [预览首装包](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.2-preview.2/Bark-Bridge-2.6.2-macOS-arm64-preview.zip) · [移动 App](docs/RELOCATION.md) · [Agy Console 提醒](docs/AGY.md)
+
+此预览支持实际 Bark.app 在同一磁盘移动或改名后继续定位设置、登录入口和程序更新。另加入兼容 Agy Console 的任务完成／最终失败提醒，复用已有设备、路由、静音、勿扰与内容预览设置。
+
+Agy 提醒还需要控制台侧终态生产者；仅安装 Bark 不会接入独立 Agy CLI 或 Antigravity IDE。本机合成接入测试获网关接受，手机实收和真实新模型任务触发尚未确认。详见 [配套条件与验证范围](docs/AGY.md)。
+
+稳定版仍为上方 **2.6.1 / Build 49**。稳定客户端不自动发现预览版；已有预览客户端可检查签名更新，稳定版用户需按维护指导显式进入预览，首装助手拒绝覆盖已有安装。不要删除设备目录或手动覆盖 App 来切换版本。
+
 ## 离开电脑，也知道下一步
 
 - **需要你时提醒。** 授权、提问／选择、本轮完成三类提醒分别控制，支持带聊天名及短问题预览。
@@ -52,6 +62,7 @@
 | **终端任务** | `bark-run` 包装明确指定的命令，保留输出与退出码；已验证事件链路 |
 | **Mac 快捷指令** | 在末尾加入模板命令；调用链路已验证，需自行配置工作流，前面的动作失败可能导致末尾动作不执行 |
 | **Claude Code · 实验性** | PermissionRequest、AskUserQuestion、Stop；仅完成配置合并与隔离测试，尚未验证真实会话 |
+| **Agy Console · 2.6.2 预览** | 兼容终态生产者的完成／最终失败事件；合成网关链路已验证，手机实收与真实新模型任务待确认。独立 CLI／IDE 不覆盖 |
 | **其他应用** | 使用自定义调用入口；能否自动触发取决于应用是否提供事件能力 |
 
 “本轮完成”表示主线程一轮回复结束，不表示所有后台工作或整个聊天已完成。
