@@ -477,7 +477,7 @@ def set_route(source_id, data):
 
 
 PRESET_MODES = {"need", "away", "focus"}
-TEMPLATES = {"terminal": ("terminal-task", "终端长任务"), "shortcuts": ("shortcuts", "快捷指令"), "claude": ("claude-code", "Claude Code")}
+TEMPLATES = {"terminal": ("terminal-task", "终端长任务"), "shortcuts": ("shortcuts", "快捷指令"), "claude": ("claude-code", "Claude Code"), "agy": ("agy-console", "Agy Console")}
 
 
 def preset_state(settings):
@@ -517,6 +517,20 @@ def template_event(name, exit_code=0):
     source_id, _ = TEMPLATES[name]
     return {"kind": "application", "source_id": source_id, "origin": "integration", "session": digest([name, os.getpid()]),
             "fingerprint": digest(uuid.uuid4().hex), "task_success": exit_code == 0}
+
+
+def agy_event(data):
+    """Accept only terminal metadata; never consume CLI output or chat history."""
+    if not isinstance(data, dict) or data.get("status") not in ("completed", "failed"):
+        return None
+    identifiers = [data.get("conversation_id"), data.get("turn_id")]
+    if any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value) for value in identifiers):
+        return None
+    return {"kind": "application", "source_id": "agy-console", "origin": "integration",
+            "session": digest(["agy-console", identifiers[0]]),
+            "fingerprint": digest(["agy-console", identifiers[1], data["status"]]),
+            "task_success": data["status"] == "completed",
+            "chat_title": preview_text(data.get("chat_title"), 100)}
 
 
 def claude_label(event):
@@ -818,7 +832,7 @@ def send_target(device, title, body, group, source_id=None):
         payload = {"device_key": device["device_key"], "title": title, "body": body, "group": group, "isArchive": "0"}
         # Codex reminders remain in phone Bark history, including generic previews.
         # Preserve the existing archive policy for every other source/legacy caller.
-        if source_id == "codex": payload["isArchive"] = "1"
+        if source_id in ("codex", "agy-console"): payload["isArchive"] = "1"
         icon = SOURCE_ICONS.get(source_id)
         if icon: payload["icon"] = icon
         result = subprocess.run([
@@ -896,6 +910,12 @@ def deliver(event, force=False, device_id=None, report=None):
             success = event.get("task_success", True)
             title = ("终端任务" if source_id == "terminal-task" else "快捷指令") + (" · 已结束" if success else " · 执行失败")
             body = "你指定的任务已结束，请返回 Mac 查看结果。" if success else "你指定的任务以非零状态退出，请返回 Mac 检查。"
+        if kind == "application" and source_id == "agy-console":
+            success = event.get("task_success") is True
+            suffix = "本轮已完成" if success else "任务未完成"
+            name = preview_text(event.get("chat_title"), 100) if settings["codex_preview"] else ""
+            title = (name + " · " if name else "") + "Agy · " + suffix
+            body = "Agy 控制台已完成本轮任务，请返回 Mac 查看结果。" if success else "Agy 控制台的本轮任务最终未完成，请返回 Mac 查看；通知不包含错误正文。"
         group = str(event.get("source", "Mac 应用")) if kind in ("application", "source_test", "battery") else "Codex"
         if source_id == "claude-code": group = "Claude Code"
         if len(devices) == 1: results = [send_target(devices[0], title, body, group, source_id)]
@@ -1130,7 +1150,7 @@ def configure_json():
 
 def main():
     parser = argparse.ArgumentParser(description="Codex Bark local notifier (never prints secrets)")
-    parser.add_argument("action", choices=["hook", "wait", "notify", "test", "configure", "status", "snapshot", "set-enabled", "pause-for", "configure-json", "sources-list", "source-add", "source-toggle", "source-remove", "source-test", "source-mute", "devices-migrate", "devices-list", "device-add", "device-toggle", "device-rename", "device-remove", "device-test", "test-json", "policy-get", "quiet-set", "route-set", "events-set", "preview-set", "diagnose", "history", "battery-event", "preset-set", "template-enable", "template-notify", "_worker"])
+    parser.add_argument("action", choices=["hook", "wait", "notify", "agy-event", "test", "configure", "status", "snapshot", "set-enabled", "pause-for", "configure-json", "sources-list", "source-add", "source-toggle", "source-remove", "source-test", "source-mute", "devices-migrate", "devices-list", "device-add", "device-toggle", "device-rename", "device-remove", "device-test", "test-json", "policy-get", "quiet-set", "route-set", "events-set", "preview-set", "diagnose", "history", "battery-event", "preset-set", "template-enable", "template-notify", "_worker"])
     parser.add_argument("value", nargs="?", choices=["on", "off", "toggle"])
     parser.add_argument("--session", default="")
     parser.add_argument("--preview-json", action="store_true")
@@ -1147,7 +1167,7 @@ def main():
     parser.add_argument("--view", choices=["menu", "panel", "history"], default="panel")
     parser.add_argument("--with-snapshot", action="store_true")
     parser.add_argument("--preset", choices=["need", "away", "focus"])
-    parser.add_argument("--template", choices=["terminal", "shortcuts", "claude"])
+    parser.add_argument("--template", choices=["terminal", "shortcuts", "claude", "agy"])
     parser.add_argument("--exit-code", type=int, default=0)
     args = parser.parse_args()
 
@@ -1260,6 +1280,8 @@ def main():
         if args.source_id:
             event["source_id"] = args.source_id
         dispatch(event)
+    elif args.action == "agy-event":
+        dispatch(agy_event(json.loads(sys.stdin.buffer.read(4096))))
     elif args.action == "_worker":
         deliver(json.loads(sys.stdin.buffer.read(4096)))
     elif args.action == "hook":

@@ -1,14 +1,14 @@
 {
   "version": "2.6.2",
-  "build": 50,
-  "tag": "v2.6.2-preview.1",
+  "build": 51,
+  "tag": "v2.6.2-preview.2",
   "channel": "preview",
   "license": "MIT",
-  "verification_status": "local_build50_installed_and_relocation_verified",
+  "verification_status": "local_build51_installed_agy_integration_verified",
   "signature": "ad-hoc; not Developer ID or notarized",
   "base_public_main": "b36f24ce4a4f2f936a123153f8cce1836dd90c5a",
-  "python_test_executions_per_interpreter": 322,
-  "python_test_passed_per_interpreter": 321,
+  "python_test_executions_per_interpreter": 330,
+  "python_test_passed_per_interpreter": 329,
   "python_test_skipped_per_interpreter": 1,
   "skip_reason": "Optional real Codex CLI test; Hook behavior unchanged.",
   "native_build": "Apple Silicon passed",
@@ -30,10 +30,34 @@
     "fresh Mac quarantine first-open",
     "Developer ID and notarization",
     "Intel and macOS13 physical device",
-    "long-term idle battery impact"
+    "long-term idle battery impact",
+    "real Agy model task after new adapter (synthetic CLI lifecycle tested)",
+    "Agy phone receipt confirmed by user"
   ],
   "interpreters": [
     "system Python3.9.6",
     "distribution Python3.13.18"
-  ]
+  ],
+  "agy": {
+    "scope": "compatible local Agy Console terminal events",
+    "producer_version": "0.1.0-preview.13",
+    "events": [
+      "completed",
+      "final_failed"
+    ],
+    "source": "agy-console",
+    "source_switch_route_mute_quiet": "inherited",
+    "preview": "current content-preview switch hides title when off",
+    "phone_history": true,
+    "no_prompts_replies_raw_errors_or_account_data": true,
+    "retry": "one final event after fallback",
+    "tests": "11 producer focused;321 producer suite;8 receiver integration",
+    "live": "same foreground PID reload, signed Bark50to51 upgrade, one synthetic event gateway accepted HTTP200",
+    "phone_receipt": "not user confirmed",
+    "not_supported": [
+      "headless approval/question waiting",
+      "standalone Agy CLI",
+      "Antigravity IDE"
+    ]
+  }
 }

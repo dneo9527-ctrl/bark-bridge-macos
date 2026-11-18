@@ -39,6 +39,7 @@ def sign(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--python-archive', type=Path, required=True)
+    parser.add_argument('--out', type=Path, default=ROOT / 'dist')
     args = parser.parse_args()
     if sys.platform != 'darwin' or os.uname().machine != 'arm64':
         raise SystemExit('This binary distribution is built and verified on Apple Silicon only.')
@@ -48,7 +49,7 @@ def main():
     verify_app_identity(ROOT / 'build/Bark.app', metadata)
     version = metadata['version']
     suffix = '-preview' if metadata['channel'] == 'preview' else ''
-    folder = ROOT / 'dist' / ('Bark-Bridge-' + version + '-macOS-arm64' + suffix)
+    folder = args.out / ('Bark-Bridge-' + version + '-macOS-arm64' + suffix)
     if folder.exists():
         raise SystemExit('Package folder exists; preserve or remove the previous build explicitly.')
     folder.mkdir(parents=True)
@@ -86,7 +87,7 @@ def main():
     archive = folder.with_name(folder.name + '.zip')
     subprocess.run(['/usr/bin/ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(folder), str(archive)], check=True)
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
-    (ROOT / 'dist/SHA256SUMS').write_text(checksum + '  ' + archive.name + '\n')
+    (args.out / 'SHA256SUMS').write_text(checksum + '  ' + archive.name + '\n')
     print(json.dumps({'archive': str(archive), 'sha256': checksum, 'bytes': archive.stat().st_size,
                       'signed': 'ad-hoc', 'notarized': False, 'installed_data_read': False}))
 
