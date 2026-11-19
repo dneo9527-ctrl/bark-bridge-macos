@@ -14,7 +14,7 @@
   "native_build": "Apple Silicon passed",
   "new_daemons": 0,
   "installed_config_read": false,
-  "publication": "Local58candidate; publicpreview52 preserved; no publication from source chat",
+  "publication": "Publisher candidate; exact-commit CI and new preview.9 archive/download checks required; oldpreview52/stable49/held51 preserved",
   "relocation": {
     "bookmark": "ordinary macOS CFURL bookmark",
     "launcher": "stable manage.py launch-app",
@@ -82,7 +82,7 @@
       "subagents/CLI/IDE",
       "other Stop hooks causing continuation"
     ],
-    "validation": "24 new isolated cases;354total eachPython;actual native icon viewed;synthetic installedHook chainHTTP200. RealnativeApp test returned Modelunavailable atattempt1/9 and was cancelled, so realquestion/completion notverified. Build56 includes two multi-device/icon identity tests; actual phone icon confirmation pending.",
+    "validation": "Existing native hook tests retained;356 tests per interpreter,355pass/1optionalCLI skip reported by developer. Publisher reruns exact source CI. Real native question/completion and dynamicneutrality remain blocked by developer modelunavailable, phone icon/receipt not confirmed.",
     "phone_icon": "official Google static full-colorPNG, fetched by iPhone; no Mac image worker"
   },
   "publisher_docs_only": true,
@@ -129,5 +129,7 @@
     "program_commit": "3be2c04b3828feee30ce9c924bcff60216e1715e",
     "scope": "prior nativehookimplementation; not currentcandidateidentity"
   },
-  "local_installed_build": 58
+  "local_installed_build": 58,
+  "publisher_runtime_changes": false,
+  "frozen_program_commit": "046568d198c2c046a1693b786c2a3bfa8e3e7be1"
 }

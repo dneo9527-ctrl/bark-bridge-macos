@@ -18,13 +18,15 @@
 
 > **已封装为原生 macOS `.app`。** 安装后有菜单栏铃铛和独立设置窗口；Apple Silicon 安装 ZIP 内含图形安装助手及 Python 3.13.18，普通用户不用终端、Xcode 或自行装 Python。当前是 GitHub 2.6.1 正式分发，未上架 App Store，未使用 Developer ID 签名或 Apple 公证。插图和视频均为功能示意。
 
-## 2.6.2 preview.3 · Build 52
+## 2.6.2 preview.9 · Build 58
 
-**[预览版 Release](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.2-preview.3)** · [预览首装包](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.2-preview.3/Bark-Bridge-2.6.2-macOS-arm64-preview.zip) · [移动 App](docs/RELOCATION.md) · [Antigravity App 提醒](docs/ANTIGRAVITY.md)
+**[预览版 Release](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/tag/v2.6.2-preview.9)** · [预览首装包](https://github.com/dneo9527-ctrl/bark-bridge-macos/releases/download/v2.6.2-preview.9/Bark-Bridge-2.6.2-macOS-arm64-preview.zip) · [移动 App](docs/RELOCATION.md) · [Antigravity App 提醒](docs/ANTIGRAVITY.md)
 
 此预览保留 Bark.app 在同一磁盘移动或改名后的定位能力，并加入 Google 原生 Antigravity.app 的官方 Hook 接入：`ask_question`、新增资源权限申请 `ask_permission` 及明确正常结束，复用已有设备、路由、静音、勿扰与内容预览设置。
 
-**原生 App 现场验证尚未完成。** 专用测试遇到模型服务不可用，真实提问／结束触发、空 JSON 在原生执行链中的动态中立性及手机实收未确认；仅隔离测试和合成网关链路通过。普通命令审批、纯文字提问、CLI／IDE／子代理不保证覆盖。来源列表图标已本机确认，手机尚无该来源的公开 HTTPS 图标。不依赖自建 Agy Console 或额外 Skill，详见 [接入及边界](docs/ANTIGRAVITY.md)。
+**原生 App 现场验证尚未完成。** 专用测试遇到模型服务不可用，真实提问／结束触发、空 JSON 在原生执行链中的动态中立性及手机实收未确认；仅隔离测试和合成网关链路通过。普通命令审批、纯文字提问、CLI／IDE／子代理不保证覆盖。手机端已配置 Google 官方彩色 HTTPS 图标；一次来源测试仅确认网关接受，手机实收和图标显示仍未确认。不依赖自建 Agy Console 或额外 Skill，详见 [接入及边界](docs/ANTIGRAVITY.md)。
+
+本版增加共用可缩放并记忆的面板、`⌘W`／`⌘Q` 和来源三横线拖动排序。正式 Build 58 已完成本机上下拖动、表外取消、退出重开保序并恢复原排列；持续停在边缘自动滚动、跨显示器／Space 与长期耗电未实测。公开分发检查见本版 Release。
 
 稳定版仍为上方 **2.6.1 / Build 49**。稳定客户端不自动发现预览版；已有预览客户端可检查签名更新，稳定版用户需按维护指导显式进入预览，首装助手拒绝覆盖已有安装。不要删除设备目录或手动覆盖 App 来切换版本。
 
@@ -53,7 +55,7 @@
 
 原生菜单栏支持右键铃铛暂停／恢复，设置面板可从菜单重新打开。**添加一个 .app 只是登记来源**，还需该应用提供 Hook、脚本或明确的调用入口，不会自动转发全部 macOS 通知。
 
-开发预览 Build 58 的面板支持拖拽边框缩放，四个主页面共用并记住窗口大小；列表在页内滚动，切页和筛选不再自动伸缩。`⌘W` 关闭当前窗口，`⌘Q` 退出设置面板；菜单栏服务及独立 Hook 仍按原有方式运行。来源行左侧三条横线可直接拖动排序，列表顺序会记住；点击也可置顶、上移、下移或置底。
+本版 Build 58 的面板支持拖拽边框缩放，四个主页面共用并记住窗口大小；列表在页内滚动，切页和筛选不再自动伸缩。`⌘W` 关闭当前窗口，`⌘Q` 退出设置面板；菜单栏服务及独立 Hook 仍按原有方式运行。来源行左侧三条横线可直接拖动排序，列表顺序会记住；点击也可置顶、上移、下移或置底。
 
 ## 可以接入哪些来源
 
