@@ -43,10 +43,12 @@ REASONS.add("event_disabled")
 STATUSES.add("source_muted")
 REASONS.add("source_muted")
 CODEX_EVENT_DEFAULTS = {"permission": True, "question": True, "complete": True}
-# Public, immutable artwork; never include device or chat information in this URL.
+# Public source artwork (pinned repository asset or official static brand image).
+# Never include device or chat information in these URLs.
 # Bark on iOS 15+ fetches it. The Mac only sends the optional API field.
 SOURCE_ICONS = {
     "codex": "https://raw.githubusercontent.com/dneo9527-ctrl/bark-bridge-macos/c664b67c01a44e9ed698dfccc69d1c6b5d1763b4/docs/media/codex-source-icon.png",
+    "com.google.antigravity": "https://antigravity.google/assets/image/brand/antigravity-icon__full-color.png",
 }
 
 QUESTION_TOOLS = re.compile(r"(?:^|__|\.)(?:request_user_input|request_user_input_async|ask_user|ask_user_question)$")

@@ -174,10 +174,71 @@ final class NavigationStrip: NSView {
 }
 
 final class SourceSwitch: NSSwitch { var sourceID = "" }
-final class SourceMenuButton: NSButton { var sourceID = "" }
+class SourceMenuButton: NSButton { var sourceID = "" }
+final class SourceInsertionLine: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.controlAccentColor.setFill(); bounds.fill()
+    }
+}
+final class SourceSortHandle: SourceMenuButton {
+    weak var tableView: NSTableView?
+    var onMove: ((String, Int) -> Bool)?
+    override func resetCursorRects() { if isEnabled { addCursorRect(bounds, cursor: .openHand) } }
+
+    private func dropRow(at location: NSPoint, in table: NSTableView) -> Int? {
+        let point = table.convert(location, from: nil)
+        guard table.visibleRect.contains(point), table.numberOfRows > 0 else { return nil }
+        let row = table.row(at: point)
+        if row < 0 { return point.y >= table.rect(ofRow: table.numberOfRows - 1).maxY ? table.numberOfRows : 0 }
+        return row + (point.y >= table.rect(ofRow: row).midY ? 1 : 0)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled, let window = window, let table = tableView else { return }
+        let origin = event.locationInWindow, id = sourceID
+        var dragged = false, closedCursor = false
+        let line = SourceInsertionLine(frame: .zero)
+        line.isHidden = true
+        table.addSubview(line, positioned: .above, relativeTo: nil)
+        defer { line.removeFromSuperview(); if closedCursor { NSCursor.pop() } }
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .keyDown]) {
+            if next.type == .keyDown {
+                if next.keyCode == 53 { return }
+                continue
+            }
+            if next.type == .leftMouseDragged {
+                if !dragged && hypot(next.locationInWindow.x - origin.x, next.locationInWindow.y - origin.y) < 4 { continue }
+                if !dragged { dragged = true; NSCursor.closedHand.push(); closedCursor = true }
+                _ = table.autoscroll(with: next)
+                if let row = dropRow(at: next.locationInWindow, in: table) {
+                    let y = row == table.numberOfRows ? table.rect(ofRow: row - 1).maxY : table.rect(ofRow: row).minY
+                    line.frame = NSRect(x: table.visibleRect.minX, y: max(0, y - 1), width: table.visibleRect.width, height: 2)
+                    line.isHidden = false; line.needsDisplay = true
+                } else { line.isHidden = true }
+                continue
+            }
+            if next.type == .leftMouseUp {
+                line.removeFromSuperview()
+                if dragged {
+                    if let row = dropRow(at: next.locationInWindow, in: table) {
+                        _ = onMove?(id, row)
+                    }
+                } else if bounds.contains(convert(next.locationInWindow, from: nil)) {
+                    sendAction(action, to: target)
+                }
+                return
+            }
+        }
+    }
+}
 final class DeviceSwitch: NSSwitch { var deviceID = "" }
 final class DeviceMenuButton: NSButton { var deviceID = "" }
 final class HistoryDetailsButton: NSButton { var event: [String: Any] = [:] }
+
+final class PageDocumentView: NSView {
+    override var isFlipped: Bool { true }
+}
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     var item: NSStatusItem!
@@ -196,9 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     var pushSwitch: NSSwitch!
     var pageControl: NavigationStrip!
     var pageSlot: NSView!
-    var pageHeight: NSLayoutConstraint?
     var historyTable: NSTableView?
-    var historyScrollHeight: NSLayoutConstraint?
     var deviceScroll: NSScrollView?
     var deviceScrollHeight: NSLayoutConstraint?
     var normalModeButton: NSButton!
@@ -355,12 +414,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         hideOthers.target = NSApp; hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "").target = NSApp
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出 Bark 面板", action: #selector(quit), keyEquivalent: "q").target = self
+        let quitItem = appMenu.addItem(withTitle: "退出 Bark 面板", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self; quitItem.keyEquivalentModifierMask = .command
         app.submenu = appMenu
         main.addItem(app)
         let file = NSMenuItem(title: "文件", action: nil, keyEquivalent: "")
         let fileMenu = NSMenu(title: "文件")
-        fileMenu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let closeItem = fileMenu.addItem(withTitle: "关闭窗口", action: #selector(closeFocusedWindow(_:)), keyEquivalent: "w")
+        closeItem.target = self; closeItem.keyEquivalentModifierMask = .command
         file.submenu = fileMenu; main.addItem(file)
         let edit = NSMenuItem(title: "编辑", action: nil, keyEquivalent: "")
         let editMenu = NSMenu(title: "编辑")
@@ -441,7 +502,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         deviceCountLabel?.stringValue = deviceEntries.isEmpty ? "尚未添加设备" : "已启用 \(activeDeviceCount) / \(deviceEntries.count) 台"
         events = snapshot["events"] as? [[String: Any]] ?? []
         latestEvent = snapshot["latest_event"] as? [String: Any]
-        sourceEntries = snapshot["sources"] as? [[String: Any]] ?? []
+        sourceEntries = orderedSources(snapshot["sources"] as? [[String: Any]] ?? [])
         let policy = snapshot["policy"] as? [String: Any] ?? [:]
         policyHealthy = policy["ok"] as? Bool ?? false
         codexEvents = policy["codex_events"] as? [String: Bool] ?? ["permission":true, "question":true, "complete":true]
@@ -552,10 +613,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func makeWindow() {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 304),
-                         styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
+        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let size = NSSize(width: min(440, screenFrame.width - 16), height: min(460, screenFrame.height - 16))
+        let w = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                         styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        w.setFrame(NSRect(origin: .zero, size: size), display: false)
+        w.minSize = NSSize(width: 420, height: 360)
         w.title = "Bark"; w.titleVisibility = .hidden; w.titlebarAppearsTransparent = true
-        w.isReleasedWhenClosed = false; w.delegate = self; w.center(); window = w
+        w.isReleasedWhenClosed = false; w.delegate = self; w.center()
+        // One remembered frame belongs to the panel, never to individual pages.
+        if w.setFrameUsingName("BarkMainPanel") {
+            let visible = (w.screen ?? NSScreen.main)?.visibleFrame.insetBy(dx: 8, dy: 8) ?? screenFrame
+            var frame = w.frame
+            frame.size.width = min(max(frame.width, w.minSize.width), visible.width)
+            frame.size.height = min(max(frame.height, w.minSize.height), visible.height)
+            frame.origin.x = max(visible.minX, min(frame.minX, visible.maxX - frame.width))
+            frame.origin.y = max(visible.minY, min(frame.minY, visible.maxY - frame.height))
+            w.setFrame(frame, display: false)
+        }
+        w.setFrameAutosaveName("BarkMainPanel"); window = w
         let backdrop = NSVisualEffectView(frame: w.contentView!.bounds)
         backdrop.material = .windowBackground; backdrop.blendingMode = .behindWindow
         backdrop.state = .active; backdrop.autoresizingMask = [.width, .height]; w.contentView = backdrop
@@ -570,14 +646,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         pageControl = NavigationStrip(labels: ["概览", "来源", "记录", "设置"], symbols: ["square.grid.2x2", "square.stack", "clock", "slider.horizontal.3"], target: self, action: #selector(selectPage(_:)))
         pageControl.selectedSegment = [0: 0, 3: 1, 1: 2, 2: 3][selectedPage] ?? 0
         pageSlot = NSView(); pageSlot.translatesAutoresizingMaskIntoConstraints = false
-        pageHeight = pageSlot.heightAnchor.constraint(equalToConstant: 192)
-        pageHeight?.isActive = true
         let root = column([header, pageControl, pageSlot], spacing: 10)
         root.translatesAutoresizingMaskIntoConstraints = false; backdrop.addSubview(root)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: backdrop.leadingAnchor, constant: 16),
             root.trailingAnchor.constraint(equalTo: backdrop.trailingAnchor, constant: -16),
             root.topAnchor.constraint(equalTo: backdrop.topAnchor, constant: 36),
+            root.bottomAnchor.constraint(equalTo: backdrop.bottomAnchor, constant: -16),
             header.heightAnchor.constraint(equalToConstant: 26),
             pageControl.heightAnchor.constraint(equalToConstant: 32),
             header.widthAnchor.constraint(equalTo: root.widthAnchor),
@@ -597,12 +672,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         for view in pageSlot.subviews { view.removeFromSuperview() }
         detailLabel = nil; lastLabel = nil; lastTitleLabel = nil; lastTimeLabel = nil; memoryLabel = nil; loginButton = nil
         testButton = nil; lowMemoryButton = nil; normalModeButton = nil; historyText = nil; sourceHint = nil
-        sourceTable = nil; historyTable = nil; historyScrollHeight = nil; presetButton = nil
+        sourceTable = nil; historyTable = nil; presetButton = nil
         historyResultPopup = nil; historySourcePopup = nil; historyCountLabel = nil; quietButton = nil; healthButton = nil
         startupSwitch = nil; residentSwitch = nil; batterySwitch = nil; modeHint = nil
         updateSwitch = nil; updateButton = nil; updateLabel = nil
         let content: NSView
-        var bodyHeight: CGFloat = 192
         switch selectedPage {
         case 1:
             let table = NSTableView(); historyTable = table
@@ -611,12 +685,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             table.selectionHighlightStyle = .none; table.backgroundColor = .clear; table.focusRingType = .default
             table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
             table.setAccessibilityLabel("最近推送记录")
-            let col = NSTableColumn(identifier: .init("history")); col.width = 392; table.addTableColumn(col)
+            // A narrow initial column lets AppKit shrink as well as grow with the viewport.
+            let col = NSTableColumn(identifier: .init("history")); col.width = 120; table.addTableColumn(col)
             let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
             scroll.borderType = .noBorder; scroll.drawsBackground = false; scroll.documentView = table
-            let listHeight = CGFloat(max(2, min(4, events.count)) * 48)
-            historyScrollHeight = scroll.heightAnchor.constraint(equalToConstant: listHeight)
-            historyScrollHeight?.isActive = true
+            scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 96).isActive = true
             let top = row([label("最近记录", size: 12, color: .secondaryLabelColor), spacer(), button("刷新", #selector(refresh), link: true)])
             let group = card(scroll, padding: 8)
             historyResultPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -640,7 +713,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             filters.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             group.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             top.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-            bodyHeight = listHeight + 34
         case 2:
             startupSwitch = NSSwitch(); startupSwitch!.controlSize = .small
             startupSwitch!.target = self; startupSwitch!.action = #selector(toggleLogin)
@@ -682,7 +754,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             for view in updates.arrangedSubviews { view.widthAnchor.constraint(equalTo: updates.widthAnchor).isActive = true }
             let updateBox = card(updates)
             content = column([box, updateBox, footer], spacing: 12)
-            bodyHeight = 365
             box.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             updateBox.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             footer.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -698,10 +769,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             table.usesAlternatingRowBackgroundColors = false
             table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
             table.setAccessibilityLabel("通知来源")
-            let col = NSTableColumn(identifier: .init("source")); col.width = 408
+            let col = NSTableColumn(identifier: .init("source")); col.width = 120
             table.addTableColumn(col); sourceTable = table
             let scroll = NSScrollView()
-            scroll.hasVerticalScroller = sourceEntries.count > 3; scroll.autohidesScrollers = true
+            scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
             scroll.borderType = .noBorder; scroll.drawsBackground = false; scroll.documentView = table
             let group = NSBox()
             group.boxType = .custom; group.cornerRadius = 10; group.borderWidth = 0.5
@@ -710,7 +781,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             group.translatesAutoresizingMaskIntoConstraints = false
             scroll.translatesAutoresizingMaskIntoConstraints = false; group.addSubview(scroll)
             NSLayoutConstraint.activate([
-                group.heightAnchor.constraint(equalToConstant: CGFloat(max(1, min(3, sourceEntries.count)) * 52)),
+                group.heightAnchor.constraint(greaterThanOrEqualToConstant: 104),
                 scroll.leadingAnchor.constraint(equalTo: group.leadingAnchor),
                 scroll.trailingAnchor.constraint(equalTo: group.trailingAnchor),
                 scroll.topAnchor.constraint(equalTo: group.topAnchor),
@@ -721,7 +792,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             help.imagePosition = .imageLeading
             let footer = row([label("\(sourceEntries.count) 个来源", size: 11, color: .secondaryLabelColor), spacer(), help])
             content = column([top, group, footer], spacing: 10)
-            bodyHeight = CGFloat(max(1, min(3, sourceEntries.count)) * 52 + 64)
             for view in [top, group, footer] { view.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
         default:
             let phone = NSImageView(image: NSImage(systemSymbolName: "iphone", accessibilityDescription: nil)!)
@@ -751,31 +821,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             for view in [device, presetRow, divider, recent, historyTop, eventTitle, actions] { view.widthAnchor.constraint(equalTo: group.widthAnchor, constant: -24).isActive = true }
             content = group
         }
-        content.translatesAutoresizingMaskIntoConstraints = false; pageSlot.addSubview(content)
-        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: pageSlot.leadingAnchor),
-                                     content.trailingAnchor.constraint(equalTo: pageSlot.trailingAnchor),
-                                     content.topAnchor.constraint(equalTo: pageSlot.topAnchor)])
+        content.translatesAutoresizingMaskIntoConstraints = false
+        if selectedPage == 2 || selectedPage == 0 {
+            // Keep compact pages top-aligned, with overflow available on short displays.
+            let scroll = NSScrollView(); scroll.translatesAutoresizingMaskIntoConstraints = false
+            scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
+            scroll.borderType = .noBorder; scroll.drawsBackground = false
+            let document = PageDocumentView(); document.translatesAutoresizingMaskIntoConstraints = false
+            scroll.documentView = document; document.addSubview(content); pageSlot.addSubview(scroll)
+            NSLayoutConstraint.activate([
+                scroll.leadingAnchor.constraint(equalTo: pageSlot.leadingAnchor),
+                scroll.trailingAnchor.constraint(equalTo: pageSlot.trailingAnchor),
+                scroll.topAnchor.constraint(equalTo: pageSlot.topAnchor),
+                scroll.bottomAnchor.constraint(equalTo: pageSlot.bottomAnchor),
+                document.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+                document.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+                document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+                content.leadingAnchor.constraint(equalTo: document.leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: document.trailingAnchor),
+                content.topAnchor.constraint(equalTo: document.topAnchor),
+                content.bottomAnchor.constraint(equalTo: document.bottomAnchor)
+            ])
+        } else {
+            // Lists fill the same viewport regardless of row count or active filters.
+            pageSlot.addSubview(content)
+            NSLayoutConstraint.activate([
+                content.leadingAnchor.constraint(equalTo: pageSlot.leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: pageSlot.trailingAnchor),
+                content.topAnchor.constraint(equalTo: pageSlot.topAnchor),
+                content.bottomAnchor.constraint(equalTo: pageSlot.bottomAnchor)
+            ])
+        }
         updateWindow()
         window?.contentView?.layoutSubtreeIfNeeded()
-        bodyHeight = ceil(content.fittingSize.height)
-        pageHeight?.constant = bodyHeight
-        fitWindow(bodyHeight: bodyHeight)
         window?.initialFirstResponder = pageControl.focusButton
         window?.recalculateKeyViewLoop()
-    }
-
-    func fitWindow(bodyHeight: CGFloat) {
-        guard let window = window else { return }
-        var frame = NSRect(x: 0, y: 0, width: 440, height: bodyHeight + 128)
-        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
-        if let screen = window.screen ?? NSScreen.main {
-            let visible = screen.visibleFrame.insetBy(dx: 8, dy: 8)
-            frame.origin.x = max(visible.minX, min(frame.origin.x, visible.maxX - frame.width))
-            frame.origin.y = max(visible.minY, min(frame.origin.y, visible.maxY - frame.height))
-        }
-        if abs(window.frame.height - frame.height) > 1 || abs(window.frame.width - frame.width) > 1 {
-            window.setFrame(frame, display: true, animate: window.isVisible)
-        }
     }
 
     func rule() -> NSBox {
@@ -821,14 +901,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         populateHistorySources()
         historyTable?.reloadData()
         historyCountLabel?.stringValue = "\(filteredHistory.count) 条 · 最多最近 200 条"
-        if selectedPage == 1, let height = historyScrollHeight {
-            height.constant = CGFloat(max(2, min(4, filteredHistory.count)) * 48)
-            window?.contentView?.layoutSubtreeIfNeeded()
-            if let content = pageSlot?.subviews.first {
-                let size = ceil(content.fittingSize.height)
-                pageHeight?.constant = size; fitWindow(bodyHeight: size)
-            }
-        }
         updateSourceControls()
     }
 
@@ -1189,6 +1261,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         sourceEntries.first { $0["id"] as? String == selectedSourceID } ?? sourceEntries.first
     }
 
+    func orderedSources(_ sources: [[String: Any]]) -> [[String: Any]] {
+        let order = preferences.stringArray(forKey: "sourceDisplayOrder") ?? []
+        var ranks: [String: Int] = [:]
+        for (index, id) in order.enumerated() where ranks[id] == nil { ranks[id] = index }
+        return sources.enumerated().sorted {
+            let left = ranks[$0.element["id"] as? String ?? ""] ?? (order.count + $0.offset)
+            let right = ranks[$1.element["id"] as? String ?? ""] ?? (order.count + $1.offset)
+            return left < right
+        }.map { $0.element }
+    }
+
+    @objc func sourceSortMenu(_ sender: SourceMenuButton) {
+        guard let index = sourceEntries.firstIndex(where: { $0["id"] as? String == sender.sourceID }) else { return }
+        let menu = NSMenu(); menu.autoenablesItems = false
+        for (title, move) in [("置顶", "first"), ("上移", "up"), ("下移", "down"), ("置底", "last")] {
+            let option = NSMenuItem(title: title, action: #selector(moveSource(_:)), keyEquivalent: "")
+            option.target = self; option.representedObject = ["id": sender.sourceID, "move": move]
+            option.isEnabled = !busy && ((move == "first" || move == "up") ? index > 0 : index < sourceEntries.count - 1)
+            menu.addItem(option)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY), in: sender)
+    }
+
+    @objc func moveSource(_ sender: NSMenuItem) {
+        guard !busy, let command = sender.representedObject as? [String: String],
+              let index = sourceEntries.firstIndex(where: { $0["id"] as? String == command["id"] }) else { return }
+        let destination: Int
+        switch command["move"] {
+        case "first": destination = 0
+        case "up": destination = max(0, index - 1)
+        case "down": destination = min(sourceEntries.count - 1, index + 1)
+        case "last": destination = sourceEntries.count - 1
+        default: return
+        }
+        guard destination != index else { return }
+        let source = sourceEntries.remove(at: index); sourceEntries.insert(source, at: destination)
+        preferences.set(sourceEntries.compactMap { $0["id"] as? String }, forKey: "sourceDisplayOrder")
+        sourceTable?.reloadData()
+    }
+
+    func reorderSource(_ id: String, beforeRow row: Int) -> Bool {
+        guard !busy, (0...sourceEntries.count).contains(row),
+              let index = sourceEntries.firstIndex(where: { $0["id"] as? String == id }) else { return false }
+        let destination = row > index ? row - 1 : row
+        guard destination != index else { return true }
+        let source = sourceEntries.remove(at: index); sourceEntries.insert(source, at: destination)
+        preferences.set(sourceEntries.compactMap { $0["id"] as? String }, forKey: "sourceDisplayOrder")
+        sourceTable?.reloadData()
+        return true
+    }
+
     func updateSourceControls() { sourceTable?.reloadData() }
 
     func numberOfRows(in tableView: NSTableView) -> Int {
@@ -1255,7 +1378,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         more.contentTintColor = .secondaryLabelColor; more.toolTip = name + "选项"
         more.setAccessibilityLabel(name + "选项")
         more.widthAnchor.constraint(equalToConstant: 24).isActive = true
-        let contents = row([icon, labels, spacer(), toggle, more], spacing: 12)
+        let sort = SourceSortHandle(image: NSImage(systemSymbolName: "line.3.horizontal", accessibilityDescription: "拖动排序")!, target: self, action: #selector(sourceSortMenu(_:)))
+        sort.tableView = tableView
+        sort.onMove = { [weak self, weak tableView] id, row in
+            guard let self = self, let table = tableView, self.sourceTable === table, !self.busy else { return false }
+            return self.reorderSource(id, beforeRow: row)
+        }
+        sort.sourceID = id; sort.isBordered = false; sort.bezelStyle = .inline
+        sort.contentTintColor = .secondaryLabelColor; sort.toolTip = "上下拖动调整顺序，点击显示排序菜单"
+        sort.setAccessibilityLabel(name + "拖动排序"); sort.isEnabled = !busy
+        sort.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        let contents = row([sort, icon, labels, spacer(), toggle, more], spacing: 10)
         contents.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(contents)
         NSLayoutConstraint.activate([
             contents.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 14),
@@ -1266,7 +1399,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if index > 0 {
             let divider = rule(); divider.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(divider)
             NSLayoutConstraint.activate([
-                divider.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 58),
+                divider.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 82),
                 divider.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
                 divider.topAnchor.constraint(equalTo: cell.topAnchor)
             ])
@@ -1429,14 +1562,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         historySource = historySourcePopup?.selectedItem?.representedObject as? String ?? "all"
         historyTable?.reloadData()
         historyCountLabel?.stringValue = "\(filteredHistory.count) 条 · 最多最近 200 条"
-        if selectedPage == 1, let height = historyScrollHeight {
-            height.constant = CGFloat(max(2, min(4, filteredHistory.count)) * 48)
-            window?.contentView?.layoutSubtreeIfNeeded()
-            if let content = pageSlot?.subviews.first {
-                let size = ceil(content.fittingSize.height)
-                pageHeight?.constant = size; fitWindow(bodyHeight: size)
-            }
-        }
     }
 
     func historyDetail(_ text: String) -> NSTextField {
@@ -1562,6 +1687,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         reload()
     }
     @objc func closeWindow() { window?.close() }
+    @objc func closeFocusedWindow(_ sender: Any?) {
+        (NSApp.keyWindow ?? NSApp.mainWindow ?? window)?.performClose(sender)
+    }
 
     func windowWillClose(_ notification: Notification) {
         if let closing = notification.object as? NSWindow, closing === deviceWindow {

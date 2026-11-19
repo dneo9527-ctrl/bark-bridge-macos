@@ -35,6 +35,28 @@ class NotificationIconTests(unittest.TestCase):
         self.assertEqual(payload['title'], 'Codex 等待授权')
         self.assertNotIn('PRIVATE_COMMAND', json.dumps(payload))
 
+    def test_native_antigravity_notifications_keep_icon_and_archive_on_every_device(self):
+        self.m.enable_template('antigravity')
+        second = self.m.add_device('https://example.test/SECOND_FAKE_KEY', 'fixture')['id']
+        self.m.set_route('com.google.antigravity', {'mode': 'selected', 'device_ids': ['primary', second]})
+        self.m.set_codex_preview(False)
+        for kind in ('permission', 'question', 'complete', 'source_test'):
+            with self.subTest(kind=kind):
+                calls = self.capture({'kind': kind, 'source_id': 'com.google.antigravity'})
+                self.assertEqual(len(calls), 2)
+                for call in calls:
+                    payload = json.loads(call.kwargs['input'])
+                    self.assertEqual(payload['icon'], self.m.SOURCE_ICONS['com.google.antigravity'])
+                    self.assertEqual(payload['isArchive'], '1')
+                    self.assertNotEqual(payload['icon'], self.m.SOURCE_ICONS['codex'])
+
+    def test_same_named_other_application_does_not_inherit_antigravity_icon(self):
+        self.m.atomic_json(self.m.SOURCES, {'sources': [
+            {'id': 'other-app', 'name': 'Antigravity', 'type': 'application', 'enabled': True}]})
+        payload = json.loads(self.capture({'kind': 'source_test', 'source_id': 'other-app'})[0].kwargs['input'])
+        self.assertNotIn('icon', payload)
+        self.assertEqual(payload['isArchive'], '0')
+
     def test_non_codex_sources_do_not_inherit_icon_from_group_label(self):
         sources = [
             {'id': 'claude-code', 'name': 'Claude Code', 'type': 'application', 'enabled': True},

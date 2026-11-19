@@ -1,20 +1,20 @@
 {
   "version": "2.6.2",
-  "build": 52,
-  "tag": "v2.6.2-preview.3",
+  "build": 58,
+  "tag": "v2.6.2-preview.9",
   "channel": "preview",
   "license": "MIT",
-  "verification_status": "Build52_frozen_program_publisher_docs_native_live_model_unavailable_CI_pending",
+  "verification_status": "resizable_shared_navigation_and_native_phone_icon",
   "signature": "ad-hoc; not Developer ID or notarized",
-  "base_public_main": "b36f24ce4a4f2f936a123153f8cce1836dd90c5a",
-  "python_test_executions_per_interpreter": 354,
-  "python_test_passed_per_interpreter": 353,
+  "base_public_main": "2e7cdd78cf4be2cec9cd87d9fd3b89741753b01d",
+  "python_test_executions_per_interpreter": 356,
+  "python_test_passed_per_interpreter": 355,
   "python_test_skipped_per_interpreter": 1,
   "skip_reason": "Optional real Codex CLI test; Hook behavior unchanged.",
   "native_build": "Apple Silicon passed",
   "new_daemons": 0,
   "installed_config_read": false,
-  "publication": "Public preview candidate preparation; no new public release yet",
+  "publication": "Local58candidate; publicpreview52 preserved; no publication from source chat",
   "relocation": {
     "bookmark": "ordinary macOS CFURL bookmark",
     "launcher": "stable manage.py launch-app",
@@ -82,9 +82,52 @@
       "subagents/CLI/IDE",
       "other Stop hooks causing continuation"
     ],
-    "validation": "24 new isolated cases;354total eachPython;actual native icon viewed;synthetic installedHook chainHTTP200. RealnativeApp test returned Modelunavailable atattempt1/9 and was cancelled, so realquestion/completion notverified."
+    "validation": "24 new isolated cases;354total eachPython;actual native icon viewed;synthetic installedHook chainHTTP200. RealnativeApp test returned Modelunavailable atattempt1/9 and was cancelled, so realquestion/completion notverified. Build56 includes two multi-device/icon identity tests; actual phone icon confirmation pending.",
+    "phone_icon": "official Google static full-colorPNG, fetched by iPhone; no Mac image worker"
   },
-  "program_source_commit": "3be2c04b3828feee30ce9c924bcff60216e1715e",
-  "program_source_tree": "3ee1f84bb254752264cd3351b28c604c56971896",
-  "publisher_docs_only": true
+  "publisher_docs_only": true,
+  "unified_navigation": {
+    "window": "user-resizable; one shared frame, remembered across panel launches",
+    "default_points": [
+      440,
+      460
+    ],
+    "minimum_points": [
+      420,
+      360
+    ],
+    "per_page_auto_resize": false,
+    "short_display": "settings/overview scroll inside shared viewport",
+    "keyboard": {
+      "command_w": "close focused panel/device window",
+      "command_q": "quit settings panel; existing menu service and independent hooks retain their lifecycle"
+    },
+    "live_installed_ui": "Build54 actual edge resize, small settings scroll, CommandW/CommandQ helper exit and reopen frame memory passed; final58 installed threebar downmove, upmove, outsidecancel and panelreopen order passed.",
+    "isolated_cases": 51,
+    "isolated_sizes": [
+      [
+        420,
+        360
+      ],
+      [
+        440,
+        460
+      ],
+      [
+        600,
+        650
+      ]
+    ],
+    "narrow_list_columns": "initial120pt then native column autoresizing, verified samepage600to420to600",
+    "source_order": "per-row three-line local mouse drag,4ptthreshold, insertion marker, edgeautoscroll, releaseoutside/Escape cancel, sourceID-based persistence; click menu fallback; no pasteboard/crossapp transfer",
+    "menu_order_cases": 16,
+    "drag_reorder_validation_cases": 43,
+    "live_drag": "Final58 actual installed panel and isolated syntheticApp: first-to-third downmove, returntofirst upmove and outsidecancel passed; installed helper quit/reopen retained order. Usercurrent order restored.",
+    "edge_autoscroll": "Called during dragged mouse events; sustained stationaryedge behavior untested."
+  },
+  "historical_native52": {
+    "program_commit": "3be2c04b3828feee30ce9c924bcff60216e1715e",
+    "scope": "prior nativehookimplementation; not currentcandidateidentity"
+  },
+  "local_installed_build": 58
 }
